@@ -47,3 +47,20 @@
 .connection-status.connected{background:#e8f6ed;color:#25653c;border-color:#bcdfc8}
 .dialog-body h3{margin:3px 0 12px;font-size:19px}
 .dialog-body hr{margin:22px 0;border:0;border-top:1px solid #cbd4de}
+
+/* v19 — aligned report summary and expandable columns */
+.report-summary{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums;background:#f6f8fb}
+.report-summary th,.report-summary td{padding:6px 2px;text-align:center;border-bottom:1px solid #b9c4d1;border-right:1px solid #cbd3de;white-space:nowrap}
+.report-summary tr> :first-child{width:35%;text-align:left;padding-left:3px}
+.report-summary tr> :last-child{border-right:0}
+.report-summary thead{background:#d3dce7}.report-summary .grand-total{font-weight:800;background:#e6ecf3}
+.count-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.values-switch{border:1px solid #b0bdca;background:#fff;color:#27384b;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;white-space:nowrap}.values-switch[aria-pressed="true"]{background:#e3edf8;color:#245a92}
+.members.values-visible{overflow-x:auto}.members.values-visible .member{min-width:max-content}.members.values-visible .member-line,.value-head{display:grid;grid-template-columns:66px var(--name-column,225px) 32px 105px 92px 82px 115px 40px;gap:10px;align-items:center}
+.value-head{padding:13px 0 10px;border-bottom:1px solid #b9c4d1;font-size:12px;color:#536176;font-weight:700;white-space:nowrap}
+.members.values-visible .member-line{min-height:68px}.members.values-visible .member .more{margin:0}.members.values-visible .member .name{white-space:nowrap}
+.value-service,.value-result,.value-studies{font-size:16px;font-weight:550;font-variant-numeric:tabular-nums}.value-studies{text-align:center}
+.note-pill{border:1px solid #bcc6d3;border-radius:999px;padding:6px 10px;background:#e8eef4;color:#34475c;font-size:12px;font-weight:650}
+.note-content{padding:14px;border-radius:10px;background:#f6f8fa;white-space:pre-wrap;overflow-wrap:anywhere;font-size:17px;line-height:1.5;max-height:55dvh;overflow:auto}
+.archive-area{border-top:1px solid #dce2eb;margin-top:22px;padding-top:18px}.archive-action{border:1px solid #e8b4b7;background:#fff2f3;color:#ae202a;border-radius:10px;padding:10px 14px;font-size:15px;font-weight:700}
+.danger-button{border:0;border-radius:10px;padding:11px 16px;background:#d7353f;color:#fff;font-weight:700}
+@media(max-width:800px){.members.values-visible .member-line,.value-head{grid-template-columns:52px var(--name-column,180px) 30px 90px 75px 67px 100px 34px;gap:6px}.note-pill{font-size:11px}.report-summary{font-size:12px}}
