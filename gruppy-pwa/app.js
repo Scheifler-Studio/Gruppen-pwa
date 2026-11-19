@@ -2,30 +2,36 @@
 const $=id=>document.getElementById(id);
 const KEY='gruppy-v1-settings',DATA='gruppy-v1-cache',HIDDEN='gruppy-v1-hidden';
 const defaults={clientId:'',folderId:'',theme:'blue',fontSize:19,itemSize:21};
-let settings={...defaults,...read(KEY,{})};let groups=[],members=[],hiddenIds=read(HIDDEN,[]),selected='all',expanded=false,accessToken='',tokenExpires=0,tokenClient=null,busy=false;let expandedMembers=new Set(),openMemberMenu=null;
+let settings={...defaults,...read(KEY,{})};let groups=[],members=[],hiddenIds=read(HIDDEN,[]),selected='all',filterGroup='all',sortOrder='az',expanded=false,accessToken='',tokenExpires=0,tokenClient=null,busy=false;let expandedMembers=new Set(),openMemberMenu=null;
 function read(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
 function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
 function cache(){save(DATA,{groups,members})}
 function esc(s){return String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]))}
 function toast(msg){$('toast').textContent=msg;$('toast').hidden=false;clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('toast').hidden=true,4200)}
 function setStatus(s){$('syncStatus').textContent=s}
-function applySettings(){const themes={blue:['#f0f4f8','#e7edf5','#3478ce'],green:['#f0f6f2','#e2eee7','#248260'],sand:['#f8f4ed','#eee6d9','#9a6a32'],dark:['#17212d','#202f40','#568cd2']};const [bg,side,accent]=themes[settings.theme]||themes.blue;let st=document.documentElement.style;st.setProperty('--bg',bg);st.setProperty('--side',side);st.setProperty('--accent',accent);st.setProperty('--panel',settings.theme==='dark'?'#263646':'#fff');st.setProperty('--text',settings.theme==='dark'?'#f4f7fb':'#172638');st.setProperty('--muted',settings.theme==='dark'?'#b0bdc9':'#6e7b89');st.setProperty('--stroke',settings.theme==='dark'?'#405468':'#d7e1eb');st.setProperty('--base',settings.fontSize+'px');st.setProperty('--item',settings.itemSize+'px')}
+function applySettings(){const themes={blue:['#f0f4f8','#e7edf5','#3478ce'],green:['#f0f6f2','#e2eee7','#248260'],sand:['#f8f4ed','#eee6d9','#9a6a32'],dark:['#17212d','#202f40','#568cd2']};const [bg,side,accent]=themes[settings.theme]||themes.blue;let st=document.documentElement.style;st.setProperty('--bg',bg);st.setProperty('--side',side);st.setProperty('--accent',accent);st.setProperty('--panel',settings.theme==='dark'?'#263646':'#fff');st.setProperty('--text',settings.theme==='dark'?'#f4f7fb':'#172638');st.setProperty('--muted',settings.theme==='dark'?'#b0bdc9':'#6e7b89');st.setProperty('--stroke',settings.theme==='dark'?'#33465a':'#c8d0d8');st.setProperty('--base',settings.fontSize+'px');st.setProperty('--item',settings.itemSize+'px')}
 function groupName(id){return groups.find(g=>g.id===id)?.name||'Без группы'}
 function visibleMembers(){return members.filter(m=>!hiddenIds.includes(m.id))}
 function render(){
  const list=$('groupList');const visible=visibleMembers();
  list.innerHTML='<button class="group-btn all-btn '+(selected==='all'?'active':'')+'" data-group="all"><span>Все участники</span><span class="count">'+visible.length+'</span></button>'+groups.map(g=>'<button class="group-btn '+(selected===g.id?'active':'')+'" data-group="'+esc(g.id)+'"><span>'+esc(g.name)+'</span><span class="count">'+visible.filter(m=>m.groupId===g.id).length+'</span></button>').join('');
+ const groupFilter=$('groupFilter');
+ const prior=groupFilter.value||filterGroup;
+ groupFilter.innerHTML='<option value="all">Все группы</option>'+groups.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');
+ if(prior==='all'||groups.some(g=>g.id===prior)){filterGroup=prior;}else{filterGroup='all';}
+ groupFilter.value=filterGroup;
  $('viewTitle').textContent=selected==='all'?'Участники':groupName(selected);
  const query=$('search').value.trim().toLocaleLowerCase();
- const filtered=visible.filter(m=>(selected==='all'||m.groupId===selected)&&[m.firstName,m.lastName,m.phone,m.address,groupName(m.groupId)].join(' ').toLocaleLowerCase().includes(query));
+ const filtered=visible.filter(m=>(selected==='all'||m.groupId===selected)&&(filterGroup==='all'||m.groupId===filterGroup)&&[m.firstName,m.lastName,m.phone,m.address,groupName(m.groupId)].join(' ').toLocaleLowerCase().includes(query));
+ const collator=new Intl.Collator(['ru','de','en'],{sensitivity:'base',numeric:true});
+ filtered.sort((a,b)=>sortOrder==='date'?String(b.addedAt||'').localeCompare(String(a.addedAt||'')):(sortOrder==='za'?-1:1)*(collator.compare(a.lastName||'',b.lastName||'')||collator.compare(a.firstName||'',b.firstName||'')));
  $('subtitle').textContent=selected==='all'?'Все группы · '+filtered.length:'Участников: '+filtered.length;
  const target=$('memberList');
  target.innerHTML=filtered.length?filtered.map(m=>{
   const isOpen=expandedMembers.has(m.id),menuOpen=openMemberMenu===m.id;
   return '<article class="member-row'+(isOpen?' is-expanded':'')+'" data-member="'+esc(m.id)+'">'+
-  '<div class="member-line"><div class="member-primary"><div class="member-name">'+esc(m.lastName)+' '+esc(m.firstName)+'</div><div class="member-meta">'+esc(groupName(m.groupId))+' · Добавлен: '+esc(m.addedAt?.slice(0,10)||'—')+'</div></div>'+
-  '<div class="row-controls"><button type="button" class="row-icon expand-icon" data-expand="'+esc(m.id)+'" aria-label="'+(isOpen?'Свернуть':'Показать')+' сведения об участнике" aria-expanded="'+isOpen+'" title="'+(isOpen?'Свернуть':'Подробнее')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>'+
-  '<button type="button" class="row-icon menu-icon" data-menu="'+esc(m.id)+'" aria-haspopup="true" aria-expanded="'+menuOpen+'" aria-label="Действия с участником" title="Действия"><svg viewBox="0 0 24 24" width="23" height="23" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div></div>'+
+  '<div class="member-line"><div class="member-primary"><span class="group-chip">'+esc(groupName(m.groupId))+'</span><span class="member-name">'+esc(m.lastName)+' '+esc(m.firstName)+'</span><button type="button" class="row-icon expand-icon" data-expand="'+esc(m.id)+'" aria-label="'+(isOpen?'Свернуть':'Показать')+' сведения об участнике" aria-expanded="'+isOpen+'" title="'+(isOpen?'Свернуть':'Подробнее')+'"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>'+ 
+  '<div class="row-controls"><button type="button" class="row-icon menu-icon" data-menu="'+esc(m.id)+'" aria-haspopup="true" aria-expanded="'+menuOpen+'" aria-label="Действия с участником" title="Действия"><svg viewBox="0 0 24 24" width="23" height="23" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div></div>'+ 
   (menuOpen?'<div class="member-popover" role="menu"><button type="button" role="menuitem" data-edit="'+esc(m.id)+'">Редактировать участника</button><div class="popover-rule"></div><button type="button" role="menuitem" class="danger" data-hide="'+esc(m.id)+'">Удалить участника</button></div>':'')+
   (isOpen?'<div class="member-detail"><div class="detail-field"><span>Адрес</span><div>'+esc(m.address||'—')+'</div></div><div class="detail-field"><span>Телефон</span><div>'+esc(m.phone||'—')+'</div></div><div class="detail-field"><span>Группа</span><div>'+esc(groupName(m.groupId))+'</div></div><div class="detail-field"><span>Дата добавления</span><div>'+esc(m.addedAt?.slice(0,10)||'—')+'</div></div></div>':'')+
   '</article>';
@@ -53,6 +59,8 @@ async function syncFromDrive(){if(!cloudConfigured())return;if(busy)return;busy=
 $('toggleGroups').onclick=()=>{expanded=!expanded;$('groupList').hidden=!expanded;$('toggleGroups').setAttribute('aria-expanded',expanded);$('chevron').classList.toggle('expanded',expanded)};
 $('groupList').onclick=e=>{const b=e.target.closest('[data-group]');if(!b)return;selected=b.dataset.group;render()};
 $('search').oninput=render;
+$('groupFilter').onchange=e=>{filterGroup=e.target.value;render()};
+$('sortSelect').onchange=e=>{sortOrder=e.target.value;render()};
 $('addBtn').onclick=()=>{$('addMenu').hidden=!$('addMenu').hidden;$('addBtn').setAttribute('aria-expanded',String(!$('addMenu').hidden))};
 $('menuAddGroup').onclick=()=>{$('addMenu').hidden=true;$('addBtn').setAttribute('aria-expanded','false');showGroup()};
 $('menuAddMember').onclick=()=>{$('addMenu').hidden=true;$('addBtn').setAttribute('aria-expanded','false');memberForm()};

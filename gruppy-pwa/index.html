@@ -9,15 +9,14 @@
   <title>Группы</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
 <div id="app" class="app">
   <aside class="sidebar">
     <div class="sidebar-title"><span>Группы</span><button id="toggleGroups" class="icon-btn" aria-label="Развернуть группы" aria-expanded="false"><svg id="chevron" width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="m8 10 4 4 4-4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
-    <div class="side-rule"></div>
     <div id="groupList" class="group-list" hidden></div>
-    <div class="sidebar-bottom"><button id="settingsBtn" class="settings-btn">⚙ <span>Настройки</span></button></div>
+    <div class="sidebar-bottom"><button id="settingsBtn" class="settings-btn"><span aria-hidden="true">⚙</span> <span>Настройки</span></button><div class="sidebar-version">Версия 5.0</div></div>
   </aside>
   <main class="main">
     <header class="topbar">
@@ -25,13 +24,13 @@
       <div class="top-search"><input type="search" id="search" placeholder="Поиск участников…" aria-label="Поиск участников" /></div>
       <div class="top-actions"><span id="syncStatus" class="sync-status">Локальный режим</span><button class="add-btn" id="addBtn" aria-label="Добавить" aria-expanded="false">+</button><div id="addMenu" class="add-menu" hidden><button id="menuAddGroup">+ Группа</button><button id="menuAddMember">+ Участник</button></div></div>
     </header>
-    <div id="subtitle" class="list-subtitle" aria-live="polite">Все группы</div><div class="build-version">Версия 4 · список строками</div>
+    <div class="filterbar"><div id="subtitle" class="list-subtitle" aria-live="polite">Все группы</div><div class="filter-controls"><label class="filter-label" for="groupFilter">Группа</label><select id="groupFilter" aria-label="Фильтр по группам"><option value="all">Все группы</option></select><label class="filter-label" for="sortSelect">Сортировка</label><select id="sortSelect" aria-label="Сортировка участников"><option value="az">Фамилия: А–Я</option><option value="za">Фамилия: Я–А</option><option value="date">Дата добавления</option></select></div></div>
     <div id="memberList" class="member-list"></div>
   </main>
 </div>
 <div id="modalBackdrop" class="modal-backdrop" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-header"><h2 id="modalTitle"></h2><button id="closeModal" class="close-btn" aria-label="Закрыть">×</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=4" defer></script>
+<script src="app.js?v=5" defer></script>
 </body>
 </html>
