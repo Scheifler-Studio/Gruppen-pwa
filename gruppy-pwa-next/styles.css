@@ -249,3 +249,19 @@
  #memberForm .member-phone-service-row{gap:8px}
  .dialog:has(#memberForm) .dialog-body{padding:14px 12px}
 }
+
+/* v26 — group export and compact one-line monthly report */
+.group-export-button{flex:none;width:39px;height:39px;display:grid;place-items:center;padding:0;border:0;border-radius:11px;color:#fff;background:#2673cc;cursor:pointer}
+.group-export-button[hidden]{display:none!important}
+.group-export-button svg{height:27px;width:27px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.admin-report-three{display:grid;grid-template-columns:minmax(144px,1.18fr) minmax(100px,.83fr) minmax(98px,.74fr);gap:13px;align-items:start}
+.admin-report-three .field{min-width:0;margin-bottom:14px;white-space:nowrap}
+.admin-report-three select{min-width:0;width:100%;font-size:16px}
+.admin-report-three .admin-report-answer-slot{min-width:0}
+#adminHours[hidden],#adminAnswer[hidden]{display:none!important}
+.group-export-dialog>p{margin:0 0 18px;line-height:1.45;color:#4d6075}
+.export-options{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.export-option{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;min-height:94px;background:#eff6fe;border:1px solid #bad4f1;border-radius:13px;padding:16px;cursor:pointer;color:#1a528d}
+.export-option strong{font-size:19px}.export-option small{color:#51667b;font-size:13px}
+.export-option:active{background:#daeafa}
+@media(max-width:550px){.admin-report-three{gap:7px;grid-template-columns:minmax(116px,1.2fr) minmax(82px,.85fr) minmax(78px,.78fr)}.admin-report-three .field{font-size:13px}.admin-report-three select{font-size:14px;padding:6px}.export-options{grid-template-columns:1fr}}
