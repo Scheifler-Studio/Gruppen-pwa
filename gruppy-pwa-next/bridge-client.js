@@ -2,7 +2,7 @@
 // A cross-origin message bridge to the Google Apps Script HTML Service iframe.
 // No credentials or Drive files are fetched directly by the public GitHub PWA.
 const GoogleBridge=(()=>{
-  let frame=null,bridgeOrigin='',bridgeReady=false,seq=0;
+  let frame=null,bridgeOrigin='',bridgeReady=false,seq=0,currentUrl='';
   const waiting=new Map();
   const listeners=new Set();
   const URL_PATTERN=/^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec(?:\?.*)?$/;
@@ -22,9 +22,9 @@ const GoogleBridge=(()=>{
   });
   function disconnect(){
     for(const [id,w] of waiting){clearTimeout(w.timer);w.reject(Error('Подключение было изменено'));waiting.delete(id)}
-    bridgeReady=false;bridgeOrigin='';frame?.remove();frame=null;announce('disconnected');
+    bridgeReady=false;bridgeOrigin='';frame?.remove();frame=null;currentUrl='';announce('disconnected');
   }
-  function connect(url){url=normalizeUrl(url);disconnect();frame=document.createElement('iframe');frame.title='Соединение с Google Drive';frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:0;opacity:0;pointer-events:none';frame.src=url;document.body.appendChild(frame);announce('connecting')}
+  function connect(url){url=normalizeUrl(url);if(frame && currentUrl===url)return;disconnect();currentUrl=url;frame=document.createElement('iframe');frame.title='Соединение с Google Drive';frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:0;opacity:0;pointer-events:none';frame.src=url;document.body.appendChild(frame);announce('connecting')}
   function call(action,payload={},token=''){
     if(!frame) return Promise.reject(Error('Сначала подключи Google Apps Script в настройках'));
     return new Promise((resolve,reject)=>{
