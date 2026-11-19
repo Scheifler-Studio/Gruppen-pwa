@@ -98,3 +98,23 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .add-footer .plus-circle{display:grid;place-items:center;width:60px;height:60px;padding:0;line-height:1;font-size:0;margin:0 auto 9px}
 .add-footer .plus-circle::after{content:'+';font-family:-apple-system,'SF Pro Display',sans-serif;font-size:43px;font-weight:350;line-height:1;display:block;transform:translateY(-2px)}
 @media(max-width:380px){.member-row .member-details{padding:14px 11px;gap:5px}.member-row .status-and-service{gap:5px}.member-row .member-name{font-size:19px}.member-action,.member-row .status-dot{width:29px;height:29px;min-width:29px;min-height:29px;flex-basis:29px}.member-row .category-chip{height:29px;min-height:29px;padding:0 7px;font-size:12px}}
+
+
+/* v23: iOS-like calendar, status order, and fully centered controls */
+.calendar-app .calendar-face{box-sizing:border-box;width:55px;height:55px;max-width:55px;max-height:55px;aspect-ratio:1;border:0;outline:0;overflow:hidden;border-radius:12px;background:#fff;box-shadow:0 2px 6px #0004;display:grid;grid-template-rows:20px 35px;transform:none}
+.calendar-app .calendar-face-month{width:100%;height:20px;min-height:20px;background:#eb3b45;color:#fff;font-size:12px;font-weight:800;line-height:20px;letter-spacing:.5px;text-align:center;border-radius:0}
+.calendar-app .calendar-face-day{width:100%;height:35px;min-height:35px;display:grid;place-items:center;color:#1a1a1c;font-size:31px;font-weight:550;line-height:1;text-align:center;transform:none;font-variant-numeric:tabular-nums}
+.screen.active-mode .toolbar-icon.calendar-app{width:58px;height:58px;display:grid;place-items:center;padding:0;overflow:visible}
+.screen.active-mode .active-toolbar{grid-template-columns:60px minmax(0,1fr) 60px;gap:8px}
+.member-row .status-and-service{display:grid;grid-template-columns:76px 34px 34px;align-items:center;justify-items:center;column-gap:7px;flex-shrink:0}
+.member-row .service-slot{width:76px;display:flex;justify-content:center;align-items:center;min-width:0}
+.member-row .category-chip{display:inline-flex;align-items:center;justify-content:center;min-height:34px;height:34px;max-width:76px;padding:0 10px;font-size:clamp(14px,3.6vw,18px);font-weight:800;line-height:1;border-radius:999px;text-align:center}
+.member-row .member-action,.member-row .status-dot{height:34px;width:34px;min-height:34px;min-width:34px;flex-basis:34px;display:grid;place-items:center;padding:0;box-sizing:border-box}
+.member-row .member-action span{display:block;margin:0;transform:none;line-height:1;font-size:12px}
+.member-row .status-dot.warn::after,.member-row .status-dot.late::after{align-self:center;justify-self:center;transform:translateY(0)}
+.add-footer .plus-circle{display:grid;place-items:center;padding:0!important;line-height:1;height:60px;width:60px;box-sizing:border-box}
+.add-footer .plus-circle::after{content:'+';display:grid;place-items:center;width:100%;height:100%;font-family:-apple-system,'SF Pro Display',sans-serif;font-size:44px;font-weight:350;line-height:1;transform:none}
+.month-grid button:disabled{opacity:1;background:#f3f4f6;color:#aab1bc;border-color:#e0e5ed;cursor:default}
+.month-grid button.current{background:#377acb;color:white;border-color:#377acb;font-weight:800}
+.about-app{text-align:center;padding:28px 8px 12px}.about-app strong{font-size:27px}.about-app p{font-size:17px;color:#677386;line-height:1.5}
+@media(max-width:380px){.member-row .status-and-service{grid-template-columns:60px 30px 30px;gap:5px}.member-row .service-slot{width:60px}.member-row .category-chip{max-width:60px;padding:0 6px;font-size:13px}.member-row .member-action,.member-row .status-dot{height:30px;width:30px;min-height:30px;min-width:30px;flex-basis:30px}}
