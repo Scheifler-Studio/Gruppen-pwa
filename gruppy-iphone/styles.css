@@ -133,3 +133,52 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .sheet #reportForm .report-inline-fields select{min-width:0;width:100%;height:48px;min-height:48px;margin-top:6px;padding:8px 22px 8px 8px;border-radius:10px;font-size:clamp(15px,4vw,18px)}
 .sheet #reportForm .report-inline-fields label[hidden]{display:none!important}
 @media(max-width:380px){.member-row .category-chip{font-size:17px}.sheet #reportForm .report-inline-fields{gap:6px;grid-template-columns:minmax(0,1.25fr) minmax(0,.82fr) minmax(0,.85fr)}.sheet #reportForm .report-inline-fields select{padding-left:5px;padding-right:16px;font-size:15px}}
+
+/* v25 — three equally sized centered report fields */
+.sheet #reportForm .report-inline-fields{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  align-items:end;
+}
+.sheet #reportForm .report-inline-fields label{
+  display:block;
+  width:100%;
+  min-width:0;
+  margin:0;
+  text-align:center;
+  white-space:normal;
+  font-size:clamp(11px,3vw,14px);
+  line-height:1.3;
+}
+.sheet #reportForm .report-value-field{min-width:0;width:100%}
+.sheet #reportForm .report-inline-fields select{
+  display:block;
+  width:100%;
+  min-width:0;
+  height:48px;
+  min-height:48px;
+  margin-top:7px;
+  padding:8px 4px;
+  font-size:clamp(15px,4vw,18px);
+  text-align:center;
+  text-align-last:center;
+  -webkit-text-align-last:center;
+}
+@media(max-width:380px){
+  .sheet #reportForm .report-inline-fields{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .sheet #reportForm .report-inline-fields select{padding:8px 2px;font-size:15px}
+}
+
+
+/* v26 — compact participant list, about 40% shorter than v25 */
+#members .member-row .member-details{
+  min-height:50px;
+  padding:7px 16px;
+  align-items:center;
+}
+#members .member-row .member-name{line-height:1.12}
+#members .member-row .status-and-service{align-self:center}
+@media(max-width:380px){
+  #members .member-row .member-details{min-height:50px;padding:8px 11px}
+}
