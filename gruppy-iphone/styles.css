@@ -199,3 +199,8 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .sheet #reportForm .report-inline-fields label{color:#101820;font-size:clamp(14px,3.7vw,17px);font-weight:750;line-height:1.2}
 .sheet #reportForm .report-inline-fields{align-items:end}
 @media(max-width:380px){#members .member-row .member-details{padding:7px 10px}.sheet #reportForm .report-inline-fields label{font-size:14px}}
+
+/* v28: visible version on the first registration screen, before entering code */
+.screen.login-mode .registration-version{display:block!important;margin:-2px auto 13px;padding:9px 16px;width:max-content;max-width:100%;font-size:17px;font-weight:600;line-height:1.4;color:#25364c;background:#e9eff8;border:1px solid #d4e0f0;border-radius:12px;text-align:center}
+.screen.login-mode .registration-version strong{font-weight:800;font-variant-numeric:tabular-nums}
+.screen.login-mode .startup-version,.screen.pending-mode .startup-version{display:block!important;visibility:visible!important;font-size:16px;color:#455e7c}
