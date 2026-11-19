@@ -265,3 +265,7 @@
 .export-option strong{font-size:19px}.export-option small{color:#51667b;font-size:13px}
 .export-option:active{background:#daeafa}
 @media(max-width:550px){.admin-report-three{gap:7px;grid-template-columns:minmax(116px,1.2fr) minmax(82px,.85fr) minmax(78px,.78fr)}.admin-report-three .field{font-size:13px}.admin-report-three select{font-size:14px;padding:6px}.export-options{grid-template-columns:1fr}}
+
+/* v28: clear no-selection starting state. */
+.initial-empty{padding:64px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:260px;text-align:center;color:#627083} 
+.initial-empty strong{font-size:23px;color:#243b56} .initial-empty p{font-size:15px;margin:0;max-width:390px;line-height:1.5} .initial-empty-icon{font-size:34px;color:#8ba0b8;margin-bottom:6px}
