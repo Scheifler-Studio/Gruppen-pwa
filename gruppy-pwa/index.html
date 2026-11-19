@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#edf2f7" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Группы</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app" class="app">
+  <aside class="sidebar">
+    <div class="sidebar-title"><span>Группы</span><button id="toggleGroups" class="icon-btn" aria-label="Развернуть группы" aria-expanded="false"><svg id="chevron" width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="m8 10 4 4 4-4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+    <div class="side-rule"></div>
+    <div id="groupList" class="group-list" hidden></div>
+    <div class="sidebar-bottom"><button id="settingsBtn" class="settings-btn">⚙ <span>Настройки</span></button></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div><h1 id="viewTitle">Участники</h1><div id="subtitle" class="subtitle">Все группы</div></div><div class="top-actions"><span id="syncStatus" class="sync-status">Локальный режим</span><button class="add-btn" id="addBtn" aria-label="Добавить">+</button><div id="addMenu" class="add-menu" hidden><button id="menuAddGroup">+ Группа</button><button id="menuAddMember">+ Участник</button></div></div></header>
+    <div class="search-area"><input type="search" id="search" placeholder="Поиск по имени, фамилии, телефону…" aria-label="Поиск участников" /></div>
+    <div id="memberList" class="member-list"></div>
+  </main>
+</div>
+<div id="modalBackdrop" class="modal-backdrop" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-header"><h2 id="modalTitle"></h2><button id="closeModal" class="close-btn" aria-label="Закрыть">×</button></div><div id="modalBody"></div></div></div>
+<div id="toast" class="toast" hidden></div>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="app.js" defer></script>
+</body>
+</html>
