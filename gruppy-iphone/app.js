@@ -80,7 +80,8 @@ $('check').onclick=refresh;$('calendarToggle').onclick=()=>{$('monthPanel').hidd
 $('monthChoices').onclick=e=>{const b=e.target.closest('[data-period]');if(!b||b.disabled||b.dataset.period!==prevMonth())return;$('month').value=b.dataset.period;$('monthPanel').hidden=true;refresh()};
 $('gear').onclick=()=>{$('groupSettings').hidden=!$('groupSettings').hidden;$('monthPanel').hidden=true};
 $('addMember').onclick=addMember;$('reorderToggle').onclick=()=>{reorderMode=!reorderMode;$('reorderToggle').textContent=reorderMode?'Завершить изменение порядка':'Изменить порядок участников';$('groupSettings').hidden=true;render()};
-$('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе','<div class="about-app"><strong>Группы</strong><p>Версия для iPhone: 28.0</p><p>Отчёты участников и управление группой</p></div>')};
+$('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе',`<div class="about-app"><strong>Группы</strong><p>Версия для iPhone: ${esc(APP_VERSION)}</p><p>Отчёты участников и управление группой</p></div>`)};
+$('groupInfo').onclick=()=>{$('groupSettings').hidden=true;openSheet('Информация о группе',`<div class="about-app"><p><strong>Группа ${esc(group||'—')}</strong></p><p>Количество участников: <strong>${members.length}</strong></p></div>`)};
 $('notifyToggle').onclick=()=>{if(!('Notification'in window)){notice('Уведомления не поддерживаются в этом браузере');return}Notification.requestPermission().then(p=>notice(p==='granted'?'Уведомления разрешены':'Уведомления не разрешены'))};
 let touchStart=null;
 $('members').addEventListener('touchstart',e=>{const row=e.target.closest('[data-member]');if(row&&e.touches.length===1)touchStart={id:row.dataset.member,x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true});

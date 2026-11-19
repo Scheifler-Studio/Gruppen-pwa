@@ -204,3 +204,22 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .screen.login-mode .registration-version{display:block!important;margin:-2px auto 13px;padding:9px 16px;width:max-content;max-width:100%;font-size:17px;font-weight:600;line-height:1.4;color:#25364c;background:#e9eff8;border:1px solid #d4e0f0;border-radius:12px;text-align:center}
 .screen.login-mode .registration-version strong{font-weight:800;font-variant-numeric:tabular-nums}
 .screen.login-mode .startup-version,.screen.pending-mode .startup-version{display:block!important;visibility:visible!important;font-size:16px;color:#455e7c}
+
+/* v29 — circular secondary action, enlarged centered report values */
+#members .member-row .member-action{
+  width:34px;height:34px;min-width:34px;min-height:34px;flex:0 0 34px;
+  border-radius:50%;background:#e6e8ed;color:#252b35;
+  display:grid;place-items:center;aspect-ratio:1;
+}
+#members .member-row .member-action span{
+  display:block;line-height:1;transform:none;letter-spacing:0;text-align:center;
+}
+.sheet #reportForm .report-inline-fields select{
+  font-size:clamp(24px,7vw,30px);
+  font-weight:700;letter-spacing:-.7px;
+  text-align:center;text-align-last:center;-webkit-text-align-last:center;
+  padding:7px 0;height:58px;min-height:58px;
+}
+@media(max-width:380px){
+ .sheet #reportForm .report-inline-fields select{font-size:clamp(23px,7vw,28px);padding:6px 0}
+}
