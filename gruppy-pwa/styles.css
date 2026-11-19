@@ -30,3 +30,5 @@
 .empty{margin-top:22px}
 @media(hover:none){.row-icon{opacity:1}}
 @media(max-width:650px){.topbar{padding:13px 12px;gap:9px;min-height:84px}.topbar h1{font-size:1.06em;max-width:32%}.top-search input{padding:9px;font-size:.78em}.top-actions{gap:6px}.add-btn{width:43px;height:43px}.list-subtitle{padding:10px 13px}.member-list{padding:0 13px 20px}.member-line{padding:12px 0}.member-detail{grid-template-columns:1fr;gap:12px}.row-icon{width:35px;height:39px}}
+
+.build-version{font-size:11px;color:var(--muted);padding:0 30px 4px;text-align:right}
