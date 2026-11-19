@@ -101,3 +101,60 @@
 .pop button{text-align:center!important}
 .pop hr{margin:3px 6px!important}
 @media(max-width:1020px){.topbar{gap:9px;padding:12px}.topbar input{max-width:400px}.chip{min-width:96px;padding:9px 12px}.chip-prefix{font-size:13px}.chip-name{font-size:17px}.value-head .month-heading{font-size:22px}}
+
+/* v22: compact aligned reports and visual polish */
+#groupNav .nav-group-label{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap}
+#groupNav button{gap:6px}#groupNav button>.nav-group-label strong{font-weight:800}
+.report-zone{padding-left:0;padding-right:0}
+.report-title{padding:0 12px}#reportContent{padding:0 0 5px}
+#reportContent>label{padding:0 12px}#reportMonth{flex:1;min-width:0;width:120px}
+.report-summary{font-size:15px;width:100%;table-layout:fixed}
+.report-summary tr>:first-child{width:37%;padding-left:10px}
+.report-summary tr>:nth-child(2){width:21%}
+.report-summary tr>:nth-child(3){width:21%}
+.report-summary tr>:nth-child(4){width:21%}
+.report-summary th,.report-summary td{padding:7px 1px;text-align:center;font-variant-numeric:tabular-nums}
+.members{padding:0;overflow:auto}
+.members .member-line{padding-left:9px;padding-right:9px}
+.members .member-line .chip{justify-self:start;min-width:0;padding:9px 13px;white-space:nowrap;font-weight:800;font-size:18px}
+.members .member-line .name-cell{padding-left:7px;padding-right:8px;gap:3px;min-width:0}
+.members.values-visible .member-line,.members.values-visible .value-head{box-sizing:border-box;grid-template-columns:120px minmax(220px,1fr) 62px 78px 85px 66px minmax(108px,.8fr) 47px;min-width:0;width:100%;padding-left:9px;padding-right:9px;gap:0}
+.members.values-visible .member{min-width:0}
+.members.values-visible .value-head{min-height:69px;padding-top:0;padding-bottom:0;border-bottom:1px solid #bcc9d8}
+.members.values-visible .value-head>span{font-size:17px;white-space:nowrap;min-width:0;text-align:center;overflow:hidden;text-overflow:clip}
+.members.values-visible .value-head .month-heading{font-size:23px;grid-column:1 / 3;justify-content:flex-start;padding-left:4px}
+.members.values-visible .value-head .status-heading{font-size:0}
+.members.values-visible .value-head .status-heading::after{content:'✓';font-size:22px}
+.members.values-visible .name-cell{min-width:0;overflow:hidden}
+.members.values-visible .name-cell .name{overflow:hidden;text-overflow:ellipsis;font-size:20px;white-space:nowrap}
+.members.values-visible .member-line>.status-cell,
+.members.values-visible .member-line>.value-service,
+.members.values-visible .member-line>.value-result,
+.members.values-visible .member-line>.value-studies,
+.members.values-visible .member-line>.value-note{padding:4px 3px;border-left:1px solid #bcc9d8}
+.members.values-visible .value-head>.status-heading,
+.members.values-visible .value-head>.value-service-head,
+.members.values-visible .value-head>.value-result-head,
+.members.values-visible .value-head>.value-studies-head,
+.members.values-visible .value-head>.value-note-head,
+.members.values-visible .value-head>.more-heading{border-left:1px solid #bcc9d8}
+.members.values-visible .value-note{justify-content:center}
+.members.values-visible .member-line>.more{justify-self:end;margin-right:2px}
+.members .member .more{width:35px;height:35px;min-width:35px;display:grid;place-items:center;opacity:1;padding:0;border-radius:50%;background:#b5bfcd;color:#fff;font-size:18px;line-height:1}
+.topbar .add,.topbar .refresh-data{display:flex;align-items:center;justify-content:center;padding:0;font-size:0}
+.topbar .add::before,.topbar .refresh-data::before{content:none!important}
+.topbar .add svg,.topbar .refresh-data svg{display:block;flex:none;transform:none}
+.topbar .refresh-data.spinning svg{animation:iconRotate .9s linear infinite}@keyframes iconRotate{to{transform:rotate(360deg)}}
+.month-picker-wrap{display:flex;align-items:center;gap:9px}
+.month-picker-wrap svg{width:31px;height:31px;fill:none;stroke:#63778c;stroke-width:1.9;flex:none}
+.month-picker-wrap input{margin-top:0!important}
+.connect-overlay{position:fixed;inset:0;background:#0f1f35a6;z-index:70;display:grid;place-items:center;padding:18px;transition:opacity .25s}
+.connect-overlay[hidden]{display:none!important}
+.connect-card{max-width:440px;width:100%;padding:30px 24px;background:#fff;border-radius:20px;text-align:center;box-shadow:0 15px 45px #06112430}
+.connect-card h3{font-size:23px;margin:14px 0}.connect-card p{color:#637082;font-size:16px;line-height:1.5}
+.connect-spinner{width:51px;height:51px;border:4px solid #d9e6f7;border-top-color:#2f77cd;border-radius:50%;margin:auto;animation:iconRotate .8s linear infinite}
+.connect-elapsed{font-variant-numeric:tabular-nums;font-weight:750;font-size:25px;margin:18px auto 5px}
+.connect-error{color:#ab2434!important;white-space:pre-wrap;overflow-wrap:anywhere}
+.connect-overlay.success .connect-card h3{color:#18864a}
+@media(max-width:1180px){.members.values-visible .member-line,.members.values-visible .value-head{grid-template-columns:110px minmax(200px,1fr) 56px 70px 72px 60px minmax(95px,.7fr) 44px}.members.values-visible .value-head>span{font-size:15px}}
+@media(max-width:850px){.members.values-visible .member-line,.members.values-visible .value-head{min-width:770px;width:770px;grid-template-columns:96px 225px 51px 65px 69px 57px 160px 47px}.members.values-visible .member-line>.chip{font-size:16px}.members.values-visible .name-cell .name{font-size:18px}.members.values-visible .value-head .month-heading{font-size:19px}}
