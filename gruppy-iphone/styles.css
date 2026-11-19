@@ -4,3 +4,11 @@
 header{background:transparent;border:0;box-shadow:none;padding:calc(25px + env(safe-area-inset-top)) 22px 5px;display:block}
 header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .panel{margin-top:23px}
+
+/* v4 — centered four-digit PIN fields */
+.code-entry{margin:19px auto 24px;max-width:340px}
+.code-boxes{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;margin:0 auto}
+.code-digit{display:block;flex:0 1 70px;min-width:0;width:70px;height:76px;min-height:76px;padding:0;margin:0;border:1.5px solid #cbd4e0;border-radius:14px;background:#f7f9fb;text-align:center;font-size:32px;font-weight:700;line-height:1;color:#233447;font-variant-numeric:tabular-nums;outline:none;box-shadow:none;-webkit-appearance:none;appearance:none}
+.code-digit::placeholder{color:#bdc3cb;opacity:1;font-size:31px}
+.code-digit:focus{border-color:#367bd0;box-shadow:0 0 0 3px #367bd026}
+@media(max-width:390px){.code-entry{max-width:290px}.code-boxes{gap:9px}.code-digit{height:64px;min-height:64px;flex-basis:62px;font-size:29px}}
