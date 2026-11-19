@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const KEY='gruppy-v1-settings',DATA='gruppy-v1-cache',HIDDEN='gruppy-v1-hidden';
 const defaults={clientId:'',folderId:'',theme:'blue',fontSize:19,itemSize:21};
-let settings={...defaults,...read(KEY,{})};let groups=[],members=[],hiddenIds=read(HIDDEN,[]),selected='all',expanded=false,accessToken='',tokenExpires=0,tokenClient=null,busy=false;
+let settings={...defaults,...read(KEY,{})};let groups=[],members=[],hiddenIds=read(HIDDEN,[]),selected='all',expanded=false,accessToken='',tokenExpires=0,tokenClient=null,busy=false;let expandedMembers=new Set(),openMemberMenu=null;
 function read(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
 function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
 function cache(){save(DATA,{groups,members})}
@@ -12,7 +12,25 @@ function setStatus(s){$('syncStatus').textContent=s}
 function applySettings(){const themes={blue:['#f0f4f8','#e7edf5','#3478ce'],green:['#f0f6f2','#e2eee7','#248260'],sand:['#f8f4ed','#eee6d9','#9a6a32'],dark:['#17212d','#202f40','#568cd2']};const [bg,side,accent]=themes[settings.theme]||themes.blue;let st=document.documentElement.style;st.setProperty('--bg',bg);st.setProperty('--side',side);st.setProperty('--accent',accent);st.setProperty('--panel',settings.theme==='dark'?'#263646':'#fff');st.setProperty('--text',settings.theme==='dark'?'#f4f7fb':'#172638');st.setProperty('--muted',settings.theme==='dark'?'#b0bdc9':'#6e7b89');st.setProperty('--stroke',settings.theme==='dark'?'#405468':'#d7e1eb');st.setProperty('--base',settings.fontSize+'px');st.setProperty('--item',settings.itemSize+'px')}
 function groupName(id){return groups.find(g=>g.id===id)?.name||'Без группы'}
 function visibleMembers(){return members.filter(m=>!hiddenIds.includes(m.id))}
-function render(){const list=$('groupList');const visible=visibleMembers();list.innerHTML='<button class="group-btn all-btn '+(selected==='all'?'active':'')+'" data-group="all"><span>Все участники</span><span class="count">'+visible.length+'</span></button>'+groups.map(g=>'<button class="group-btn '+(selected===g.id?'active':'')+'" data-group="'+esc(g.id)+'"><span>'+esc(g.name)+'</span><span class="count">'+visible.filter(m=>m.groupId===g.id).length+'</span></button>').join('');$('viewTitle').textContent=selected==='all'?'Участники':groupName(selected);const query=$('search').value.trim().toLocaleLowerCase();const filtered=visible.filter(m=>(selected==='all'||m.groupId===selected)&&[m.firstName,m.lastName,m.phone,m.address,groupName(m.groupId)].join(' ').toLocaleLowerCase().includes(query));$('subtitle').textContent=selected==='all'?'Все группы · '+filtered.length:'Участников: '+filtered.length;const target=$('memberList');target.innerHTML=filtered.length?filtered.map(m=>'<article class="member-card"><div><div class="member-name">'+esc(m.lastName)+' '+esc(m.firstName)+'</div><div class="member-meta">'+esc(groupName(m.groupId))+' · Добавлен: '+esc(m.addedAt?.slice(0,10)||'—')+'</div>'+(m.phone?'<div class="member-meta">'+esc(m.phone)+'</div>':'')+'</div><div class="card-controls"><button class="small-btn" data-edit="'+esc(m.id)+'">Открыть</button><button class="small-btn" data-hide="'+esc(m.id)+'">Убрать</button></div></article>').join(''):'<div class="empty"><strong>Участников пока нет</strong>Нажмите «+» в правом верхнем углу, чтобы создать группу или участника.</div>';}
+function render(){
+ const list=$('groupList');const visible=visibleMembers();
+ list.innerHTML='<button class="group-btn all-btn '+(selected==='all'?'active':'')+'" data-group="all"><span>Все участники</span><span class="count">'+visible.length+'</span></button>'+groups.map(g=>'<button class="group-btn '+(selected===g.id?'active':'')+'" data-group="'+esc(g.id)+'"><span>'+esc(g.name)+'</span><span class="count">'+visible.filter(m=>m.groupId===g.id).length+'</span></button>').join('');
+ $('viewTitle').textContent=selected==='all'?'Участники':groupName(selected);
+ const query=$('search').value.trim().toLocaleLowerCase();
+ const filtered=visible.filter(m=>(selected==='all'||m.groupId===selected)&&[m.firstName,m.lastName,m.phone,m.address,groupName(m.groupId)].join(' ').toLocaleLowerCase().includes(query));
+ $('subtitle').textContent=selected==='all'?'Все группы · '+filtered.length:'Участников: '+filtered.length;
+ const target=$('memberList');
+ target.innerHTML=filtered.length?filtered.map(m=>{
+  const isOpen=expandedMembers.has(m.id),menuOpen=openMemberMenu===m.id;
+  return '<article class="member-row'+(isOpen?' is-expanded':'')+'" data-member="'+esc(m.id)+'">'+
+  '<div class="member-line"><div class="member-primary"><div class="member-name">'+esc(m.lastName)+' '+esc(m.firstName)+'</div><div class="member-meta">'+esc(groupName(m.groupId))+' · Добавлен: '+esc(m.addedAt?.slice(0,10)||'—')+'</div></div>'+
+  '<div class="row-controls"><button type="button" class="row-icon expand-icon" data-expand="'+esc(m.id)+'" aria-label="'+(isOpen?'Свернуть':'Показать')+' сведения об участнике" aria-expanded="'+isOpen+'" title="'+(isOpen?'Свернуть':'Подробнее')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>'+
+  '<button type="button" class="row-icon menu-icon" data-menu="'+esc(m.id)+'" aria-haspopup="true" aria-expanded="'+menuOpen+'" aria-label="Действия с участником" title="Действия"><svg viewBox="0 0 24 24" width="23" height="23" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div></div>'+
+  (menuOpen?'<div class="member-popover" role="menu"><button type="button" role="menuitem" data-edit="'+esc(m.id)+'">Редактировать участника</button><div class="popover-rule"></div><button type="button" role="menuitem" class="danger" data-hide="'+esc(m.id)+'">Удалить участника</button></div>':'')+
+  (isOpen?'<div class="member-detail"><div class="detail-field"><span>Адрес</span><div>'+esc(m.address||'—')+'</div></div><div class="detail-field"><span>Телефон</span><div>'+esc(m.phone||'—')+'</div></div><div class="detail-field"><span>Группа</span><div>'+esc(groupName(m.groupId))+'</div></div><div class="detail-field"><span>Дата добавления</span><div>'+esc(m.addedAt?.slice(0,10)||'—')+'</div></div></div>':'')+
+  '</article>';
+ }).join(''):'<div class="empty"><strong>Участников пока нет</strong>Нажмите «+» в правом верхнем углу, чтобы создать группу или участника.</div>';
+}
 function openModal(title,html){$('modalTitle').textContent=title;$('modalBody').innerHTML=html;$('modalBackdrop').hidden=false}
 function closeModal(){$('modalBackdrop').hidden=true;$('modalBody').innerHTML=''}
 function showGroup(){openModal('Новая группа','<form id="groupForm"><label class="field">Название группы<input name="name" maxlength="100" required autofocus placeholder="Например, Группа А"></label><div class="actions"><button class="secondary" type="button" id="cancelForm">Отмена</button><button class="primary" type="submit">Создать группу</button></div></form>');$('cancelForm').onclick=closeModal;$('groupForm').onsubmit=async e=>{e.preventDefault();const name=e.target.elements.name.value.trim();if(!name)return;if(groups.some(g=>g.name.toLocaleLowerCase()===name.toLocaleLowerCase()))return toast('Группа с таким названием уже существует');const g={id:crypto.randomUUID(),name,createdAt:new Date().toISOString()};groups.push(g);cache();render();closeModal();if(cloudConfigured()){try{await writeGroups();toast('Группа сохранена в Google Drive')}catch(err){toast('Группа локально сохранена; ошибка Drive: '+err.message)}}else toast('Группа создана локально. Для Drive откройте настройки.')};}
@@ -35,12 +53,19 @@ async function syncFromDrive(){if(!cloudConfigured())return;if(busy)return;busy=
 $('toggleGroups').onclick=()=>{expanded=!expanded;$('groupList').hidden=!expanded;$('toggleGroups').setAttribute('aria-expanded',expanded);$('chevron').classList.toggle('expanded',expanded)};
 $('groupList').onclick=e=>{const b=e.target.closest('[data-group]');if(!b)return;selected=b.dataset.group;render()};
 $('search').oninput=render;
-$('addBtn').onclick=()=>{$('addMenu').hidden=!$('addMenu').hidden};
-$('menuAddGroup').onclick=()=>{$('addMenu').hidden=true;showGroup()};
-$('menuAddMember').onclick=()=>{$('addMenu').hidden=true;memberForm()};
+$('addBtn').onclick=()=>{$('addMenu').hidden=!$('addMenu').hidden;$('addBtn').setAttribute('aria-expanded',String(!$('addMenu').hidden))};
+$('menuAddGroup').onclick=()=>{$('addMenu').hidden=true;$('addBtn').setAttribute('aria-expanded','false');showGroup()};
+$('menuAddMember').onclick=()=>{$('addMenu').hidden=true;$('addBtn').setAttribute('aria-expanded','false');memberForm()};
 $('settingsBtn').onclick=showSettings;
 $('closeModal').onclick=closeModal;
 $('modalBackdrop').onclick=e=>{if(e.target===$('modalBackdrop'))closeModal()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('addMenu').hidden=true}});
-$('memberList').onclick=e=>{const eb=e.target.closest('[data-edit]'),hb=e.target.closest('[data-hide]');if(eb){const m=members.find(x=>x.id===eb.dataset.edit);if(m)memberForm(m)}if(hb){const m=members.find(x=>x.id===hb.dataset.hide);if(m&&confirm('Убрать '+m.firstName+' '+m.lastName+' из списка только на этом iPad? JSON в Google Drive останется без изменений.')){hiddenIds.push(m.id);save(HIDDEN,hiddenIds);render();toast('Участник скрыт. JSON не изменён.')}}};
+$('memberList').onclick=e=>{
+ const expand=e.target.closest('[data-expand]'), menu=e.target.closest('[data-menu]'),edit=e.target.closest('[data-edit]'),hide=e.target.closest('[data-hide]');
+ if(expand){const id=expand.dataset.expand;expandedMembers.has(id)?expandedMembers.delete(id):expandedMembers.add(id);openMemberMenu=null;render();return}
+ if(menu){openMemberMenu=openMemberMenu===menu.dataset.menu?null:menu.dataset.menu;render();return}
+ if(edit){const m=members.find(x=>x.id===edit.dataset.edit);openMemberMenu=null;if(m)memberForm(m);render();return}
+ if(hide){const m=members.find(x=>x.id===hide.dataset.hide);openMemberMenu=null;if(m&&confirm('Удалить '+m.firstName+' '+m.lastName+' из списка только на этом iPad? JSON в Google Drive останется без изменений.')){if(!hiddenIds.includes(m.id))hiddenIds.push(m.id);save(HIDDEN,hiddenIds);expandedMembers.delete(m.id);render();toast('Участник удалён из списка. JSON не изменён.')}else render();return}
+};
+document.addEventListener('click',e=>{if(openMemberMenu&&!e.target.closest('.member-popover, [data-menu]')){openMemberMenu=null;render()}if(!$('addMenu').hidden&&!e.target.closest('#addBtn, #addMenu')){$('addMenu').hidden=true;$('addBtn').setAttribute('aria-expanded','false')}});
 (function init(){const cached=read(DATA,{groups:[],members:[]});groups=cached.groups||[];members=cached.members||[];applySettings();render();if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(console.warn);if(cloudConfigured()){setStatus('Подключение…');window.addEventListener('load',()=>setTimeout(()=>connectDrive(false),600))}})();
