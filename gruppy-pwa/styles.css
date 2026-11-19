@@ -64,3 +64,15 @@
 .member-popover{top:56px}
 @media(hover:none){.sidebar-title .icon-btn{opacity:1}.member-primary .expand-icon,.menu-icon{opacity:.75}}
 @media(max-width:760px){.filterbar{padding:10px 12px;align-items:flex-start;flex-direction:column;gap:7px}.filter-controls{justify-content:flex-start}.group-chip{max-width:92px}.member-primary{gap:6px}.sidebar-title{padding-left:8px}.member-line{min-height:65px}.member-name{font-size:calc(var(--item) - 2px)}}
+
+/* v6: group appointment */
+.assignment-row{display:flex;align-items:flex-start;gap:18px;width:100%}
+.assignment-row>.field{min-width:0}
+.assignment-row .group-field{flex:0 1 33.33%}
+.assignment-row .appointment-field{flex:1}
+.assignment-row select{appearance:none;-webkit-appearance:none;background-color:var(--bg);background-image:none;border:1px solid var(--stroke);border-radius:9px;min-height:48px;padding:10px 36px 10px 12px;box-shadow:none}
+.assignment-row .field{position:relative}
+.assignment-row .field:after{content:'⌄';position:absolute;right:14px;bottom:12px;pointer-events:none;font-size:19px;color:var(--muted);font-weight:400}
+.role-leader{color:#bf3039!important}
+.role-assistant{color:#226eb8!important}
+@media(max-width:420px){.assignment-row{gap:9px}.assignment-row .group-field{flex-basis:36%}.assignment-row select{padding-left:7px;padding-right:20px;font-size:.83em}.assignment-row .field:after{right:6px}}
