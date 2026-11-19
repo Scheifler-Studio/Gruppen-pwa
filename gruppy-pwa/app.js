@@ -14,6 +14,7 @@ function roleTitle(role){return role==='leader'?'Ответственный за
 function roleClass(role){return role==='leader'?'role-leader':role==='assistant'?'role-assistant':''}
 function groupName(id){return groups.find(g=>g.id===id)?.name||'Без группы'}
 function visibleMembers(){return members.filter(m=>!hiddenIds.includes(m.id))}
+function formatRuDate(iso){if(!iso)return '—';const d=new Date(iso);if(Number.isNaN(d.getTime())){const m=String(iso).match(/(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:String(iso)}return new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}).format(d)}
 function render(){
  const list=$('groupList');const visible=visibleMembers();
  list.innerHTML='<button class="group-btn all-btn '+(selected==='all'?'active':'')+'" data-group="all"><span>Все участники</span><span class="count">'+visible.length+'</span></button>'+groups.map(g=>'<button class="group-btn '+(selected===g.id?'active':'')+'" data-group="'+esc(g.id)+'"><span>'+esc(g.name)+'</span><span class="count">'+visible.filter(m=>m.groupId===g.id).length+'</span></button>').join('');
@@ -35,7 +36,7 @@ function render(){
   '<div class="member-line"><div class="member-primary"><span class="group-chip">'+esc(groupName(m.groupId))+'</span><span class="member-name '+roleClass(m.role)+'">'+esc(m.lastName)+' '+esc(m.firstName)+'</span><button type="button" class="row-icon expand-icon" data-expand="'+esc(m.id)+'" aria-label="'+(isOpen?'Свернуть':'Показать')+' сведения об участнике" aria-expanded="'+isOpen+'" title="'+(isOpen?'Свернуть':'Подробнее')+'"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>'+ 
   '<div class="row-controls"><button type="button" class="row-icon menu-icon" data-menu="'+esc(m.id)+'" aria-haspopup="true" aria-expanded="'+menuOpen+'" aria-label="Действия с участником" title="Действия"><svg viewBox="0 0 24 24" width="23" height="23" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div></div>'+ 
   (menuOpen?'<div class="member-popover" role="menu"><button type="button" role="menuitem" data-edit="'+esc(m.id)+'">Редактировать участника</button><div class="popover-rule"></div><button type="button" role="menuitem" class="danger" data-hide="'+esc(m.id)+'">Удалить участника</button></div>':'')+
-  (isOpen?'<div class="member-detail">'+(m.role?'<div class="detail-field"><span>Назначение</span><div class="'+roleClass(m.role)+'">'+esc(roleTitle(m.role))+'</div></div>':'')+'<div class="detail-field"><span>Адрес</span><div>'+esc(m.address||'—')+'</div></div><div class="detail-field"><span>Телефон</span><div>'+esc(m.phone||'—')+'</div></div><div class="detail-field"><span>Группа</span><div>'+esc(groupName(m.groupId))+'</div></div><div class="detail-field"><span>Дата добавления</span><div>'+esc(m.addedAt?.slice(0,10)||'—')+'</div></div></div>':'')+
+  (isOpen?'<div class="member-detail">'+(m.role?'<div class="detail-field"><span>Назначение</span><div class="'+roleClass(m.role)+'">'+esc(roleTitle(m.role))+'</div></div>':'')+'<div class="detail-field"><span>Адрес</span><div>'+esc(m.address||'—')+'</div></div><div class="detail-field"><span>Телефон</span><div>'+esc(m.phone||'—')+'</div></div><div class="detail-field"><span>Группа</span><div>'+esc(groupName(m.groupId))+'</div></div><div class="detail-field"><span>Дата добавления</span><div>'+esc(formatRuDate(m.addedAt))+'</div></div></div>':'')+
   '</article>';
  }).join(''):'<div class="empty"><strong>Участников пока нет</strong>Нажмите «+» в правом верхнем углу, чтобы создать группу или участника.</div>';
 }
@@ -55,7 +56,7 @@ function memberForm(m=null){
  '<label class="field appointment-field">Назначить<select name="role"><option value="">Выбрать</option><option value="leader" '+(selectedRole==='leader'?'selected':'')+'>Ответственный за группу</option><option value="assistant" '+(selectedRole==='assistant'?'selected':'')+'>Помощник</option></select></label></div>'+ 
  '<label class="field">Адрес<textarea name="address" rows="2">'+esc(m?.address||'')+'</textarea></label>'+ 
  '<label class="field">Телефон<input name="phone" type="tel" value="'+esc(m?.phone||'')+'"></label>'+ 
- (edit?'<p class="hint">Дата создания: '+esc(m.addedAt?.slice(0,10))+'<br>Файл: '+esc(m.fileName||'')+'</p>':'<p class="hint">Дата добавления устанавливается автоматически. Для каждого участника создаётся отдельный JSON.</p>')+
+ (edit?'<p class="hint">Дата создания: '+esc(formatRuDate(m.addedAt))+'<br>Файл: '+esc(m.fileName||'')+'</p>':'<p class="hint">Дата добавления устанавливается автоматически. Для каждого участника создаётся отдельный JSON.</p>')+
  '<div class="actions"><button class="secondary" type="button" id="cancelForm">Отмена</button><button class="primary" type="submit">'+(edit?'Сохранить':'Добавить участника')+'</button></div></form>');
  $('cancelForm').onclick=closeModal;
  $('memberForm').onsubmit=async e=>{
