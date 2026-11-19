@@ -182,3 +182,20 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 @media(max-width:380px){
   #members .member-row .member-details{min-height:50px;padding:8px 11px}
 }
+
+/* v27: colored complete/incomplete rows, no service/status columns */
+#members .member-row.reported{background:#e5f7e8;border-bottom-color:#c7e6cb}
+#members .member-row.waiting{background:#fff8d9;border-bottom-color:#eee1b8}
+#members .member-row.overdue{background:#fce8ec;border-bottom-color:#f1d0d7}
+#members .member-row .member-details{background:transparent;min-height:50px;padding:7px 13px;gap:10px}
+#members .member-row .member-names{flex:1 1 auto;min-width:0;flex-wrap:nowrap}
+#members .member-row .member-name{font-size:clamp(17px,4.9vw,22px);line-height:1.17;overflow-wrap:normal;word-break:normal;hyphens:none}
+#members .member-row .member-action{background:#e6e8ed;color:#252b35;border:1px solid #c8cdd4;border-radius:11px;flex:none;width:34px;height:34px;min-width:34px;min-height:34px;display:grid;place-items:center;padding:0}
+#members .member-row .member-action span{font-size:13px;font-weight:900;letter-spacing:0;transform:none;line-height:1}
+#members .member-row .member-action:active{background:#d2d7e0}
+.screen.login-mode header,.screen.pending-mode header{transform:translateY(-13px);gap:8px}
+.screen.login-mode .startup-version,.screen.pending-mode .startup-version{font-size:15px;font-weight:650;color:#63758a;margin-top:0}
+.screen.active-mode .startup-version{display:none}
+.sheet #reportForm .report-inline-fields label{color:#101820;font-size:clamp(14px,3.7vw,17px);font-weight:750;line-height:1.2}
+.sheet #reportForm .report-inline-fields{align-items:end}
+@media(max-width:380px){#members .member-row .member-details{padding:7px 10px}.sheet #reportForm .report-inline-fields label{font-size:14px}}

@@ -19,9 +19,28 @@ function statusFor(m){const queued=outbox.find(x=>x.data.memberId===m.id&&x.data
 function updateCalendarIcon(){const now=new Date(),abbr=['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];$('todayMonth').textContent=abbr[now.getMonth()];$('todayDay').textContent=String(now.getDate())}
 function updatePeriod(){const m=$('month').value;$('periodLabel').innerHTML='<span class="period-year">'+esc(m.slice(0,4))+'</span><span class="period-month">'+esc(months[Number(m.slice(5))-1]||'')+'</span>';updateCalendarIcon();renderMonthChoices()}
 function renderMonthChoices(){const active=prevMonth(),lastYear=Math.max(2026,Number(active.slice(0,4)));let html='';for(let year=2026;year<=lastYear;year++){html+=`<div class="month-year">${year}</div><div class="month-grid">`;for(let i=0;i<12;i++){const key=`${year}-${String(i+1).padStart(2,'0')}`,available=key===active;html+=`<button type="button" data-period="${key}" ${available?'':'disabled'} class="${available?'current':''}" aria-label="${months[i]} ${year}${available?'':' — недоступно'}">${months[i]}</button>`}html+='</div>'} $('monthChoices').innerHTML=html}
-function render(){updatePeriod();$('groupName').textContent=group;const collator=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});const all=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);if(ai>=0&&bi>=0)return ai-bi;if(ai>=0)return -1;if(bi>=0)return 1;return collator.compare(a.lastName||'',b.lastName||'')||collator.compare(a.firstName||'',b.firstName||'')});
- $('members').innerHTML=all.map((m,i)=>{const state=statusFor(m),role=m.role==='leader'?'leader':m.role==='assistant'?'assistant':'';return `<div class="member-row" data-member="${esc(m.id)}"><div class="member-details"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span></span><span class="status-and-service"><span class="service-slot">${(m.effectiveCategory||m.category)?`<small class="category-chip">${esc(m.effectiveCategory||m.category)}</small>`:''}</span><span class="status-dot ${state.cls}" title="${esc(state.label)}" aria-label="${esc(state.label)}">${(state.cls==='warn'||state.cls==='late')?'<svg class="status-minus-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M10 16 H22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>':state.glyph}</span><button type="button" class="member-action" data-edit="${esc(m.id)}" aria-label="Внести отчёт: ${esc(m.lastName)} ${esc(m.firstName)}"><span aria-hidden="true">•••</span></button></span></div>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`}).join('')||'<div class="empty">В группе пока нет участников.</div>';
+function render(){
+ updatePeriod();$('groupName').textContent=group;
+ const collator=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});
+ // The secretary's manual order remains the tie-breaker. Unsubmitted reports are always first.
+ const stateById=new Map(members.map(m=>[m.id,statusFor(m)]));
+ const all=members.slice().sort((a,b)=>{
+  const aDone=stateById.get(a.id).cls==='done',bDone=stateById.get(b.id).cls==='done';
+  if(aDone!==bDone)return aDone?1:-1;
+  const ai=order.indexOf(a.id),bi=order.indexOf(b.id);
+  if(ai>=0&&bi>=0)return ai-bi;
+  if(ai>=0)return -1;if(bi>=0)return 1;
+  return collator.compare(a.lastName||'',b.lastName||'')||collator.compare(a.firstName||'',b.firstName||'');
+ });
+ const day=new Date().getDate();
+ $('members').innerHTML=all.map((m,i)=>{
+  const state=stateById.get(m.id),role=m.role==='leader'?'leader':m.role==='assistant'?'assistant':'';
+  const rowTone=state.cls==='done'?'reported':day<=10?'waiting':'overdue';
+  const suffix=state.cls==='sending'?' — отправляется':state.cls==='warn'?' — ошибка отправки':'';
+  return `<div class="member-row ${rowTone}" data-member="${esc(m.id)}" title="${esc(state.label+suffix)}"><div class="member-details"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span></span><button type="button" class="member-action" data-edit="${esc(m.id)}" aria-label="Внести отчёт: ${esc(m.lastName)} ${esc(m.firstName)}"><span aria-hidden="true">•••</span></button></div>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`;
+ }).join('')||'<div class="empty">В группе пока нет участников.</div>';
 }
+
 async function refresh(){if(!settings.token){show('login');return}if(refreshing)return;refreshing=true;try{
  const d=await phoneCall('phoneBootstrap',{month:$('month').value});
  if(d.status==='pending'){show('pending');$('pendingText').textContent='Ваш код отправлен. В ближайшее время заявка будет рассмотрена.';return}
@@ -61,7 +80,7 @@ $('check').onclick=refresh;$('calendarToggle').onclick=()=>{$('monthPanel').hidd
 $('monthChoices').onclick=e=>{const b=e.target.closest('[data-period]');if(!b||b.disabled||b.dataset.period!==prevMonth())return;$('month').value=b.dataset.period;$('monthPanel').hidden=true;refresh()};
 $('gear').onclick=()=>{$('groupSettings').hidden=!$('groupSettings').hidden;$('monthPanel').hidden=true};
 $('addMember').onclick=addMember;$('reorderToggle').onclick=()=>{reorderMode=!reorderMode;$('reorderToggle').textContent=reorderMode?'Завершить изменение порядка':'Изменить порядок участников';$('groupSettings').hidden=true;render()};
-$('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе','<div class="about-app"><strong>Группы</strong><p>Версия для iPhone: 26.0</p><p>Отчёты участников и управление группой</p></div>')};
+$('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе','<div class="about-app"><strong>Группы</strong><p>Версия для iPhone: 27.0</p><p>Отчёты участников и управление группой</p></div>')};
 $('notifyToggle').onclick=()=>{if(!('Notification'in window)){notice('Уведомления не поддерживаются в этом браузере');return}Notification.requestPermission().then(p=>notice(p==='granted'?'Уведомления разрешены':'Уведомления не разрешены'))};
 let touchStart=null;
 $('members').addEventListener('touchstart',e=>{const row=e.target.closest('[data-member]');if(row&&e.touches.length===1)touchStart={id:row.dataset.member,x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true});
