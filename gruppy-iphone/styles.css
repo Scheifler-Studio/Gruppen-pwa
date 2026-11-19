@@ -75,3 +75,26 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .month-panel{position:sticky;top:calc(80px + env(safe-area-inset-top));z-index:12;box-shadow:0 8px 20px #0002}
 .group-settings{position:sticky;top:calc(80px + env(safe-area-inset-top));z-index:12;box-shadow:0 8px 20px #0002}
 @media(max-width:390px){.member-name{font-size:20px}.category-chip{font-size:11px;padding:0 6px}.status-and-service{gap:5px}}
+
+/* v22: compact iOS-style live-date calendar and precisely aligned member actions */
+.screen.active-mode .active-toolbar{grid-template-columns:56px minmax(0,1fr) 56px}
+.screen.active-mode .toolbar-icon.calendar-app{display:grid;place-items:center;width:53px;height:57px;padding:0}
+.calendar-face{width:45px;height:49px;display:flex;flex-direction:column;overflow:hidden;border-radius:8px;background:#fff;box-shadow:0 1px 5px #0005;border:1px solid #e2e2e2;transform:translateZ(0)}
+.calendar-face-month{height:16px;background:#e03d45;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;letter-spacing:.7px}
+.calendar-face-day{flex:1;display:grid;place-items:center;color:#17191d;font-size:28px;font-weight:520;line-height:1;font-variant-numeric:tabular-nums;transform:translateY(-1px)}
+.period-label{flex-direction:row;justify-content:center;align-items:baseline;gap:12px;white-space:nowrap;line-height:1.05}
+.period-year{font-size:clamp(23px,6vw,31px);color:#c43342;font-weight:790}
+.period-month{font-size:clamp(23px,6vw,31px);color:#fff;font-weight:790}
+.member-row .member-details{min-height:81px;width:100%;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.member-row .member-names{flex:1 1 auto;min-width:0}
+.member-row .status-and-service{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-shrink:0;white-space:nowrap}
+.member-action{flex:0 0 32px;width:32px;height:32px;border:0;border-radius:50%;background:#20232a;color:#fff;display:grid;place-items:center;margin:0;padding:0;box-shadow:none;-webkit-tap-highlight-color:transparent}
+.member-action span{font-size:12px;font-weight:900;letter-spacing:-1px;line-height:1;transform:translateY(-1px)}
+.member-action:active{background:#505762}
+.member-row .status-dot{flex:0 0 32px;width:32px;height:32px;min-width:32px;min-height:32px;display:grid;place-items:center;margin:0;padding:0;font-size:23px;line-height:1;text-align:center}
+.member-row .status-dot.warn,.member-row .status-dot.late{font-size:0}
+.member-row .status-dot.warn::after,.member-row .status-dot.late::after{content:'';display:block;width:14px;height:3px;border-radius:2px;background:#fff;grid-area:1/1;align-self:center;justify-self:center}
+.member-row .category-chip{min-height:32px;height:32px;min-width:35px;padding:0 10px;font-size:clamp(13px,3.2vw,16px);font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.add-footer .plus-circle{display:grid;place-items:center;width:60px;height:60px;padding:0;line-height:1;font-size:0;margin:0 auto 9px}
+.add-footer .plus-circle::after{content:'+';font-family:-apple-system,'SF Pro Display',sans-serif;font-size:43px;font-weight:350;line-height:1;display:block;transform:translateY(-2px)}
+@media(max-width:380px){.member-row .member-details{padding:14px 11px;gap:5px}.member-row .status-and-service{gap:5px}.member-row .member-name{font-size:19px}.member-action,.member-row .status-dot{width:29px;height:29px;min-width:29px;min-height:29px;flex-basis:29px}.member-row .category-chip{height:29px;min-height:29px;padding:0 7px;font-size:12px}}
