@@ -41,3 +41,9 @@
 .pop{position:fixed;right:auto;top:auto;width:208px;max-width:calc(100vw - 20px);z-index:100;padding:4px 6px;border-radius:12px;box-shadow:0 12px 32px #0002;overflow:visible}
 .pop button{min-height:44px;padding:10px 12px;font-size:16px;line-height:1.25;white-space:nowrap}
 .pop hr{margin:4px 5px;border:0;border-top:1px solid #d4dce4}
+
+/* v12 — Google Apps Script connection */
+.connection-status{padding:12px 15px;background:#f7eae7;border:1px solid #e8c9c4;border-radius:10px;margin:10px 0;color:#994134;font-size:15px}
+.connection-status.connected{background:#e8f6ed;color:#25653c;border-color:#bcdfc8}
+.dialog-body h3{margin:3px 0 12px;font-size:19px}
+.dialog-body hr{margin:22px 0;border:0;border-top:1px solid #cbd4de}
