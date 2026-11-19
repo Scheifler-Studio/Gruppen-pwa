@@ -205,3 +205,9 @@
 @media(max-width:850px){
  .members.values-visible .member-line,.members.values-visible .value-head{min-width:760px;width:760px;grid-template-columns:72px 265px 54px 66px 70px 56px minmax(100px,1fr) 48px}
 }
+
+/* v24: full-width month picker, clear dropdown after menu action */
+#reportContent > .report-month-picker{display:block;width:100%;padding:0 8px;margin:4px 0 11px;}
+#reportContent .report-month-picker #reportMonth{display:block;width:100%;max-width:none;min-width:0;height:45px;min-height:45px;box-sizing:border-box;margin:0;padding:8px 7px;border-radius:9px;font-size:17px;font-weight:700;text-align:center;text-align-last:center;font-variant-numeric:tabular-nums;color:#25354a;background-color:#fff;}
+#reportMonth::-webkit-date-and-time-value{text-align:center;}
+#reportMonth::-webkit-datetime-edit{text-align:center;}
