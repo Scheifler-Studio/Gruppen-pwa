@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const KEY='gruppen-duo-iphone';let settings=JSON.parse(localStorage.getItem(KEY)||'{}'),members=[],reports=[],group='',person='';
 const prevMonth=()=>{let d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};$('month').value=prevMonth();
-const show=(id)=>{for(const x of ['login','pending','active'])$(x).hidden=x!==id};const notice=s=>{$('notice').textContent=s;$('notice').hidden=false;setTimeout(()=>$('notice').hidden=true,4200)};
+const show=(id)=>{for(const x of ['login','pending','active'])$(x).hidden=x!==id;const screen=document.querySelector('.screen');screen.classList.remove('login-mode','pending-mode','active-mode');screen.classList.add(id+'-mode')};const notice=s=>{$('notice').textContent=s;$('notice').hidden=false;setTimeout(()=>$('notice').hidden=true,4200)};
 const save=()=>localStorage.setItem(KEY,JSON.stringify(settings));
 async function api(path,options={}){if(!APP_API_URL)throw Error('Сервер ещё не настроен. Обратитесь к секретарю.');const res=await fetch(APP_API_URL.replace(/\/$/,'')+path,{...options,headers:{...(options.body?{'content-type':'application/json'}:{}),...(settings.token?{Authorization:'Bearer '+settings.token}:{}),...(options.headers||{})}});const data=await res.json().catch(()=>({error:'Неверный ответ сервера'}));if(!res.ok)throw Object.assign(new Error(data.error||`HTTP ${res.status}`),{status:res.status});return data}
 const post=(p,x)=>api(p,{method:'POST',body:JSON.stringify(x)});

@@ -12,3 +12,15 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .code-digit::placeholder{color:#bdc3cb;opacity:1;font-size:31px}
 .code-digit:focus{border-color:#367bd0;box-shadow:0 0 0 3px #367bd026}
 @media(max-width:390px){.code-entry{max-width:290px}.code-boxes{gap:9px}.code-digit{height:64px;min-height:64px;flex-basis:62px;font-size:29px}}
+
+/* v5 centered registration and logo */
+.screen.login-mode,.screen.pending-mode{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 0 calc(16px + env(safe-area-inset-bottom))}
+.screen.login-mode header,.screen.pending-mode header{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 20px;text-align:center}
+.brand-icon{display:block;width:88px;height:88px;border-radius:20px;object-fit:contain}
+.screen.login-mode header h1,.screen.pending-mode header h1{text-align:center;font-size:32px}
+.screen.login-mode .panel,.screen.pending-mode .panel{margin:24px 17px 0;text-align:center}
+.screen.login-mode .panel h2,.screen.pending-mode .panel h2,.screen.login-mode .panel p,.screen.pending-mode .panel p{text-align:center}
+.screen.login-mode .code-entry{margin-left:auto;margin-right:auto}
+.screen.active-mode header{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.screen.active-mode .brand-icon{width:58px;height:58px;border-radius:13px}
+@media(max-height:680px){.screen.login-mode,.screen.pending-mode{justify-content:flex-start}.screen.login-mode .brand-icon,.screen.pending-mode .brand-icon{width:65px;height:65px}}
