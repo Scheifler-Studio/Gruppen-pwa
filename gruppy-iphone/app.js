@@ -1,65 +1,60 @@
-'use strict';
+"use strict";
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
-const KEY='gruppen-duo-iphone';let settings=JSON.parse(localStorage.getItem(KEY)||'{}'),members=[],reports=[],group='',person='';
-const prevMonth=()=>{let d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};$('month').value=prevMonth();
-const show=(id)=>{for(const x of ['login','pending','active'])$(x).hidden=x!==id;const screen=document.querySelector('.screen');screen.classList.remove('login-mode','pending-mode','active-mode');screen.classList.add(id+'-mode')};const notice=s=>{$('notice').textContent=s;$('notice').hidden=false;setTimeout(()=>$('notice').hidden=true,4200)};
-const save=()=>localStorage.setItem(KEY,JSON.stringify(settings));
-// Вся информация загружается через ограниченные операции Google Apps Script.
-// Коды и ключи доступа не передаются пользователю в списке участников.
+const KEY='gruppen-duo-iphone';let settings=JSON.parse(localStorage.getItem(KEY)||'{}'),members=[],reports=[],order=[],group='',person='',myRole='';
+let reorderMode=false,requesting=false,refreshing=false,pendingTimer=null,reminderTimer=null;
+const months=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+function prevMonth(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
+$('month').value=prevMonth();
+const show=id=>{for(const x of ['login','pending','active'])$(x).hidden=x!==id;const el=document.querySelector('.screen');el.classList.remove('login-mode','pending-mode','active-mode');el.classList.add(id+'-mode')};
+let noticeTimer=null;
+function notice(s){$('notice').textContent=s;$('notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('notice').hidden=true,4500)}
+function save(){localStorage.setItem(KEY,JSON.stringify(settings))}
 let bridgeInitialized=false;
 function connectBridge(){if(!bridgeInitialized){GoogleBridge.connect(APP_SCRIPT_URL);bridgeInitialized=true}}
-const phoneCall=(action,payload={})=>{connectBridge();return GoogleBridge.call(action,payload,settings.token||'')};
-async function refresh(){
- if(!settings.token){show('login');return}
- try{
-  const d=await phoneCall('phoneBootstrap',{month:$('month').value});
-  if(d.status==='pending'){show('pending');return}
-  if(d.status==='rejected'){settings.token='';save();show('login');notice('Регистрация отклонена. Обратитесь к секретарю.');return}
-  if(d.status!=='approved')throw Error('Нет подтверждения регистрации');
-  members=Array.isArray(d.members)?d.members:[];
-  reports=Array.isArray(d.reports)?d.reports:[];
-  group=d.group||'';person=d.person||'';
-  show('active');render();
- }catch(e){
-  if(/недействител|отозван|не найден|отклонен|отклонён|Регистрация удалена/i.test(e.message)){
-   settings.token='';save();show('login');notice(e.message)
-  }else notice('Нет связи с Google Drive: '+e.message)
- }
+function phoneCall(action,payload={}){connectBridge();return GoogleBridge.call(action,payload,settings.token||'')}
+const maxMonth=()=>prevMonth();
+const monthText=m=>{const a=/^(\d{4})-(\d{2})$/.exec(m||'');return a?`${a[1]} · ${months[Number(a[2])-1]}`:'—'};
+function statusFor(m){const report=reports.find(x=>x.memberId===m.id);if(report)return {cls:'done',glyph:'✓',label:'Отчёт сохранён'};const now=new Date();const day=now.getDate();const isLatest=$('month').value===prevMonth();if(isLatest&&day>15)return {cls:'late',glyph:'−',label:'Отчёт просрочен'};if(isLatest&&day>10)return {cls:'warn',glyph:'−',label:'Отчёт ожидается'};return {cls:'empty',glyph:'',label:'Нет отчёта'}}
+function updatePeriod(){const m=$('month').value;$('periodLabel').textContent=monthText(m);renderMonthChoices()}
+function renderMonthChoices(){const max=prevMonth(),yy=Number(max.slice(0,4));let html='';for(let year=yy;year>=yy-4;year--){html+=`<div class="month-year">${year}</div><div class="month-grid">`;for(let i=0;i<12;i++){const key=`${year}-${String(i+1).padStart(2,'0')}`,future=key>max;html+=`<button type="button" data-period="${key}" ${future?'disabled':''} class="${key===$('month').value?'current':''}">${months[i]}</button>`}html+='</div>'} $('monthChoices').innerHTML=html}
+function render(){updatePeriod();$('groupName').textContent=group;const collator=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});const all=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);if(ai>=0&&bi>=0)return ai-bi;if(ai>=0)return -1;if(bi>=0)return 1;return collator.compare(a.lastName||'',b.lastName||'')||collator.compare(a.firstName||'',b.firstName||'')});
+ $('members').innerHTML=all.map((m,i)=>{const state=statusFor(m),role=m.role==='leader'?'leader':m.role==='assistant'?'assistant':'';return `<div class="member-row" data-member="${esc(m.id)}"><button type="button" class="member-details" data-edit="${esc(m.id)}"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span>${m.category?`<small class="category-chip">${esc(m.category)}</small>`:''}</span><span class="status-dot ${state.cls}" title="${esc(state.label)}" aria-label="${esc(state.label)}">${state.glyph}</span><span class="chev">›</span></button>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`}).join('')||'<div class="empty">В группе пока нет участников.</div>';
 }
-function render(){const col=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});$('members').innerHTML=members.slice().sort((a,b)=>col.compare(a.lastName,b.lastName)||col.compare(a.firstName,b.firstName)).map(m=>{const r=reports.find(x=>x.memberId===m.id);return `<button class="member" data-id="${esc(m.id)}"><div><span class="member-name">${esc(m.lastName)} ${esc(m.firstName)}</span><small>${esc(r?.category||m.category||'Категория не выбрана')}</small></div><span class="status ${r?'done':''}">${r?'Сохранено':'Нет отчёта'}</span><span class="chev">›</span></button>`}).join('')||'<div class="empty">В группе пока нет участников.</div>'}
-const options=(from,to,selected)=>Array.from({length:to-from+1},(_,i)=>`<option value="${i+from}" ${(i+from)===Number(selected)?'selected':''}>${i+from}</option>`).join('');
-function edit(m){const r=reports.find(x=>x.memberId===m.id)||{},category=r.category||m.category||'APV';$('formTitle').textContent=m.lastName+' '+m.firstName;$('formBody').innerHTML=`<form id="reportForm"><label>Месяц<input name="month" type="month" value="${esc($('month').value)}" required></label><label>Категория<select name="category">${['APV','HPV','V','UV'].map(x=>`<option ${x===category?'selected':''}>${x}</option>`).join('')}</select></label><div class="row"><label id="hoursField">Часы<select name="hours">${options(0,999,r.hours??0)}</select></label><label id="answerField" hidden>Ответ<select name="answer"><option value="" selected disabled>Выбрать</option><option value="yes" ${r.answer==='yes'?'selected':''}>Да / Ja</option><option value="no" ${r.answer==='no'?'selected':''}>Нет / Nein</option></select></label><label>Изучение<select name="studies">${options(0,10,r.studies??0)}</select></label></div><p class="hint" id="modeHint"></p><label>Примечание<textarea name="note" maxlength="3000" placeholder="Заметка для секретаря">${esc(r.note||'')}</textarea></label><div id="error" class="error" hidden></div><button class="primary" type="submit">Сохранить отчёт</button></form>`;$('overlay').hidden=false;const f=$('reportForm');function mode(){let h=['APV','HPV'].includes(f.elements.category.value);$('hoursField').hidden=!h;$('answerField').hidden=h;$('modeHint').textContent=h?'APV / HPV: количество часов от 0 до 999.':'V / UV: только ответ «Да / Ja» или «Нет / Nein».'}f.elements.category.onchange=mode;mode();f.onsubmit=async e=>{e.preventDefault();const elems=f.elements;const data={memberId:m.id,month:elems.month.value,category:elems.category.value,hours:Number(elems.hours.value),answer:elems.answer.value,studies:Number(elems.studies.value),note:elems.note.value};try{await phoneCall('phoneReport',data);$('overlay').hidden=true;$('month').value=data.month;await refresh();notice('Отчёт сохранён')}catch(ex){$('error').hidden=false;$('error').textContent=ex.message}}}
-const digits=Array.from(document.querySelectorAll('.code-digit'));
-const joinedCode=$('joinedCode');
-const setDigits=(text,start=0)=>{
- const numbers=String(text||'').replace(/\D/g,'');
- if(!numbers)return;
- for(let i=0;i<numbers.length && start+i<4;i++)digits[start+i].value=numbers[i];
- joinedCode.value=digits.map(x=>x.value).join('');
- digits[Math.min(start+numbers.length,3)].focus();
-};
-digits.forEach((field,i)=>{
- field.addEventListener('input',()=>{
-   const value=field.value.replace(/\D/g,'');
-   field.value='';
-   setDigits(value,i);
-   if(!value)joinedCode.value=digits.map(x=>x.value).join('');
- });
- field.addEventListener('paste',e=>{
-   const clip=e.clipboardData?.getData('text')||'';
-   if(/\d/.test(clip)){e.preventDefault();setDigits(clip,i)}
- });
- field.addEventListener('keydown',e=>{
-   if(e.key==='Backspace'){
-     if(field.value){field.value=''}
-     else if(i>0){digits[i-1].value='';digits[i-1].focus()}
-     joinedCode.value=digits.map(x=>x.value).join('');
-     e.preventDefault();
-   }else if(e.key==='ArrowLeft'&&i>0){e.preventDefault();digits[i-1].focus()}
-   else if(e.key==='ArrowRight'&&i<3){e.preventDefault();digits[i+1].focus()}
- });
- field.addEventListener('focus',()=>field.select());
-});
-
-$('loginForm').onsubmit=async e=>{e.preventDefault();try{const code=digits.map(x=>x.value).join('');if(!/^\d{4}$/.test(code)){notice('Введите все четыре цифры кода');digits.find(x=>!x.value)?.focus();return}const a=await phoneCall('phoneRegister',{code});settings.token=a.token;save();$('pendingText').textContent=`${a.name}. Заявка отправлена секретарю. После подтверждения список участников откроется автоматически.`;show('pending')}catch(ex){notice(ex.message)}};$('check').onclick=refresh;$('month').onchange=refresh;$('members').onclick=e=>{const b=e.target.closest('[data-id]');if(b){const m=members.find(x=>x.id===b.dataset.id);if(m)edit(m)}};$('close').onclick=()=>{$('overlay').hidden=true};$('overlay').onclick=e=>{if(e.target===$('overlay'))$('overlay').hidden=true};
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});connectBridge();if(settings.token)refresh();else show('login');setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden)refresh()},30000);
+async function refresh(){if(!settings.token){show('login');return}if(refreshing)return;refreshing=true;try{
+ const d=await phoneCall('phoneBootstrap',{month:$('month').value});
+ if(d.status==='pending'){show('pending');$('pendingText').textContent='Ваш код отправлен. В ближайшее время заявка будет рассмотрена.';return}
+ if(d.status==='rejected'){settings.token='';save();show('login');notice('Регистрация отклонена. Обратитесь к секретарю.');return}
+ if(d.status!=='approved')throw Error('Нет подтверждения регистрации');
+ members=Array.isArray(d.members)?d.members:[];reports=Array.isArray(d.reports)?d.reports:[];order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.role||'';show('active');render();showMonthlyReminder();
+ }catch(e){if(/недействител|отозван|не найден|отклонен|отклонён|Регистрация удалена/i.test(e.message)){settings.token='';save();show('login');notice(e.message)}else notice('Нет связи с Google Drive: '+e.message)}finally{refreshing=false}}
+function showMonthlyReminder(){const now=new Date(),monthKey=`${now.getFullYear()}-${now.getMonth()+1}`;if(now.getDate()!==1||now.getHours()<10)return;
+ if(localStorage.getItem('gruppen-month-reminder')===monthKey)return;
+ localStorage.setItem('gruppen-month-reminder',monthKey);$('monthReminder').hidden=false;
+ setTimeout(()=>$('monthReminder').hidden=true,15000);
+ // Notification only while the PWA is executing. Closed-app push requires a push service.
+ if('Notification'in window&&Notification.permission==='granted'&&document.visibilityState==='visible')try{new Notification('Группы',{body:'Наступило время собирать отчёты',icon:'icon-192.png'})}catch{} }
+const options=(from,to,value)=>Array.from({length:to-from+1},(_,i)=>`<option value="${i+from}" ${Number(value)===i+from?'selected':''}>${i+from}</option>`).join('');
+function openSheet(title,html){$('formTitle').textContent=title;$('formBody').innerHTML=html;$('overlay').hidden=false}
+function closeSheet(){$('overlay').hidden=true;$('formBody').innerHTML=''}
+function editReport(m){const r=reports.find(x=>x.memberId===m.id)||{},category=r.category||m.category||'APV';openSheet(m.lastName+' '+m.firstName,`<form id="reportForm"><div class="report-period">${esc(monthText($('month').value))}</div><label>Вид служения<select name="category">${['APV','HPV','V','UV'].map(x=>`<option ${x===category?'selected':''}>${x}</option>`).join('')}</select></label><div class="row"><label id="hoursField">Часы<select name="hours">${options(0,999,r.hours??0)}</select></label><label id="answerField" hidden>Ответ<select name="answer"><option value="" ${!r.answer?'selected':''} disabled>Выбрать</option><option value="yes" ${r.answer==='yes'?'selected':''}>Да</option><option value="no" ${r.answer==='no'?'selected':''}>Nein</option></select></label><label>Изучения<select name="studies">${options(0,10,r.studies??0)}</select></label></div><label>Примечание<textarea name="note" maxlength="3000" placeholder="Заметка для секретаря">${esc(r.note||'')}</textarea></label><div id="error" class="error" hidden></div><button class="primary" type="submit">Сохранить</button></form>`);
+ const form=$('reportForm');function mode(){const hours=['APV','HPV'].includes(form.elements.category.value);$('hoursField').hidden=!hours;$('answerField').hidden=hours}form.elements.category.onchange=mode;mode();form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,submit=f.querySelector('button[type=submit]');submit.disabled=true;submit.textContent='Сохранение…';const data={memberId:m.id,month:$('month').value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};try{await phoneCall('phoneReport',data);closeSheet();await refresh();notice('Сохранено')}catch(ex){submit.disabled=false;submit.textContent='Сохранить';$('error').hidden=false;$('error').textContent=ex.message}}}
+function addMember(){openSheet('Новый участник',`<form id="newMemberForm"><label>Имя<input required name="firstName" maxlength="120"></label><label>Фамилия<input required name="lastName" maxlength="120"></label><label>Адрес<textarea name="address" rows="2"></textarea></label><label>Телефон<input name="phone" type="tel"></label><label>Вид служения<select name="category"><option value="">Выбрать</option>${['APV','HPV','V','UV'].map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label><p class="hint">Группа ${esc(group)} назначается автоматически. Должности назначает только секретарь.</p><div id="error" class="error" hidden></div><button class="primary" type="submit">Добавить участника</button></form>`);$('newMemberForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Сохранение…';try{await phoneCall('phoneAddMember',{firstName:f.elements.firstName.value.trim(),lastName:f.elements.lastName.value.trim(),address:f.elements.address.value.trim(),phone:f.elements.phone.value.trim(),category:f.elements.category.value});closeSheet();await refresh();notice('Участник добавлен')}catch(err){btn.disabled=false;btn.textContent='Добавить участника';$('error').hidden=false;$('error').textContent=err.message}}}
+async function removeMember(m){if(m.role){notice('Удалять ответственного и помощника может только секретарь');return}if(!confirm('Удалить участника '+m.lastName+' '+m.firstName+' из списка? Его JSON останется на Google Drive.'))return;try{await phoneCall('phoneRemoveMember',{memberId:m.id});await refresh();notice('Участник скрыт из группы')}catch(e){notice(e.message)}}
+const digits=Array.from(document.querySelectorAll('.code-digit')),joinedCode=$('joinedCode');
+function setDigits(text,start=0){const numbers=String(text||'').replace(/\D/g,'');if(!numbers)return;for(let i=0;i<numbers.length&&start+i<4;i++)digits[start+i].value=numbers[i];joinedCode.value=digits.map(x=>x.value).join('');digits[Math.min(start+numbers.length,3)].focus()}
+digits.forEach((field,i)=>{field.addEventListener('input',()=>{const v=field.value.replace(/\D/g,'');field.value='';setDigits(v,i);if(!v)joinedCode.value=digits.map(x=>x.value).join('')});field.addEventListener('paste',e=>{const v=e.clipboardData?.getData('text')||'';if(/\d/.test(v)){e.preventDefault();setDigits(v,i)}});field.addEventListener('keydown',e=>{if(e.key==='Backspace'){if(field.value)field.value='';else if(i>0){digits[i-1].value='';digits[i-1].focus()}joinedCode.value=digits.map(x=>x.value).join('');e.preventDefault()}else if(e.key==='ArrowLeft'&&i>0){e.preventDefault();digits[i-1].focus()}else if(e.key==='ArrowRight'&&i<3){e.preventDefault();digits[i+1].focus()}});field.addEventListener('focus',()=>field.select())});
+$('loginForm').onsubmit=async e=>{e.preventDefault();if(requesting)return;const code=digits.map(x=>x.value).join('');if(!/^\d{4}$/.test(code)){notice('Введите все четыре цифры кода');digits.find(x=>!x.value)?.focus();return}requesting=true;const btn=$('loginForm').querySelector('button');btn.disabled=true;show('pending');$('pendingText').textContent='Отправляем ваш код…';try{const a=await phoneCall('phoneRegister',{code});settings.token=a.token;save();$('pendingText').textContent='Ваш код отправлен. В ближайшее время заявка будет рассмотрена.';refresh()}catch(ex){show('login');notice(ex.message)}finally{requesting=false;btn.disabled=false}};
+$('check').onclick=refresh;$('calendarToggle').onclick=()=>{$('monthPanel').hidden=!$('monthPanel').hidden;$('groupSettings').hidden=true};
+$('monthChoices').onclick=e=>{const b=e.target.closest('[data-period]');if(!b||b.disabled)return;$('month').value=b.dataset.period;$('monthPanel').hidden=true;refresh()};
+$('gear').onclick=()=>{$('groupSettings').hidden=!$('groupSettings').hidden;$('monthPanel').hidden=true};
+$('addMember').onclick=addMember;$('reorderToggle').onclick=()=>{reorderMode=!reorderMode;$('reorderToggle').textContent=reorderMode?'Завершить изменение порядка':'Изменить порядок участников';$('groupSettings').hidden=true;render()};
+$('notifyToggle').onclick=()=>{if(!('Notification'in window)){notice('Уведомления не поддерживаются в этом браузере');return}Notification.requestPermission().then(p=>notice(p==='granted'?'Уведомления разрешены':'Уведомления не разрешены'))};
+let touchStart=null;
+$('members').addEventListener('touchstart',e=>{const row=e.target.closest('[data-member]');if(row&&e.touches.length===1)touchStart={id:row.dataset.member,x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true});
+$('members').addEventListener('touchend',e=>{if(!touchStart||!e.changedTouches.length)return;const end=e.changedTouches[0],dx=end.clientX-touchStart.x,dy=end.clientY-touchStart.y,id=touchStart.id;touchStart=null;if(dx<-85&&Math.abs(dy)<50){const m=members.find(x=>x.id===id);if(m)removeMember(m)}},{passive:true});
+$('members').onclick=async e=>{const edit=e.target.closest('[data-edit]'),up=e.target.closest('[data-up]'),down=e.target.closest('[data-down]');if(edit&&!reorderMode){const m=members.find(x=>x.id===edit.dataset.edit);if(m)editReport(m);return}if(up||down){const id=up?.dataset.up||down.dataset.down;const sorted=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);return (ai<0?9999:ai)-(bi<0?9999:bi)});const index=sorted.findIndex(m=>m.id===id),next=index+(up?-1:1);if(next<0||next>=sorted.length)return;[sorted[index],sorted[next]]=[sorted[next],sorted[index]];const ids=sorted.map(m=>m.id);try{await phoneCall('phoneReorder',{ids});order=ids;render()}catch(ex){notice(ex.message)}}};
+$('close').onclick=closeSheet;$('overlay').onclick=e=>{if(e.target===$('overlay'))closeSheet()};
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+connectBridge();if(settings.token)refresh();else show('login');
+setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden)refresh()},30000);
+setInterval(()=>{if(settings.token&&!document.hidden&&!$('active').hidden)showMonthlyReminder()},60000);

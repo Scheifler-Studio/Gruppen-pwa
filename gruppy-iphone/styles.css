@@ -24,3 +24,30 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .screen.active-mode header{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
 .screen.active-mode .brand-icon{width:58px;height:58px;border-radius:13px}
 @media(max-height:680px){.screen.login-mode,.screen.pending-mode{justify-content:flex-start}.screen.login-mode .brand-icon,.screen.pending-mode .brand-icon{width:65px;height:65px}}
+
+/* v17 — dashboard, status badges, month selector, compact flat fields */
+.screen.active-mode{background:#f2f5fa;max-width:650px}
+.screen.active-mode>header{display:none}
+.active-toolbar{display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:10px;padding:calc(14px + env(safe-area-inset-top)) 18px 8px}
+.toolbar-icon{border:0;background:transparent;color:#485d76;display:grid;place-items:center;width:46px;height:46px;border-radius:12px}
+.toolbar-icon:active{background:#e4eaf1}.period-label{text-align:center;font-size:21px;font-weight:750}
+.group-title{text-align:center;font-size:28px;font-weight:750;margin:12px 0 18px}
+.member-row{background:white;border-bottom:1px solid #c8d1dd;position:relative;display:flex;align-items:stretch}
+.member-details{background:transparent;border:0;display:flex;gap:10px;align-items:center;justify-content:space-between;width:100%;padding:18px 16px;text-align:left;min-height:75px;color:#203147}
+.member-names{flex:1;display:flex;align-items:center;gap:11px;min-width:0;flex-wrap:wrap}.member-name{font-size:20px;font-weight:650;overflow-wrap:anywhere}.member-name.leader{color:#c52935;font-weight:800}.member-name.assistant{color:#216fbd;font-weight:800}
+.category-chip{display:inline-flex;background:#eaedf1;color:#20252a;border-radius:999px;font-size:12px;font-weight:700;padding:5px 8px}
+.status-dot{display:inline-flex;width:27px;height:27px;border-radius:50%;flex:none;align-items:center;justify-content:center;font-size:20px;font-weight:750}
+.status-dot.done{background:#30a25d;color:white}.status-dot.warn{background:#e79a2e;color:#fff}.status-dot.late{background:#d6383a;color:#fff}.status-dot.empty{background:white;border:2px solid #b5bfce}
+.member-details .chev{color:#9eafbf;font-size:29px;font-weight:300}
+.add-footer{text-align:center;padding:25px 0 48px;color:#627286;font-size:14px}
+.plus-circle{display:block;margin:0 auto 9px;width:60px;height:60px;border-radius:50%;background:white;color:#397ccc;border:0;font-size:39px;line-height:1;box-shadow:0 4px 17px #263e5d24}
+.month-panel,.group-settings{background:#fff;border-top:1px solid #e2e6ec;border-bottom:1px solid #d2d9e3;padding:15px 18px;max-height:60dvh;overflow-y:auto}
+.month-panel h3{font-size:16px;margin:0 0 9px}.month-year{font-size:15px;font-weight:750;color:#52657b;margin:12px 0 8px}
+.month-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.month-grid button{border:1px solid #ccd5df;background:#f5f8fb;color:#243952;border-radius:8px;padding:11px 3px;font-size:13px;min-height:42px}.month-grid button.current{background:#386eb5;color:white}.month-grid button:disabled{opacity:.28}
+.group-settings button{border:0;background:transparent;text-align:left;padding:15px 5px;width:100%;border-bottom:1px solid #dbe2e9;color:#243952}
+.month-reminder{margin:10px 16px;padding:13px;background:#e8f3ff;border:1px solid #aac7eb;color:#1d548e;border-radius:10px;font-weight:700;text-align:center}
+.order-buttons{display:flex;gap:1px;align-items:center;padding-right:8px}.order-buttons button{border:0;background:#e6edf6;color:#396caa;border-radius:8px;width:38px;height:42px;font-size:22px}.order-buttons button:disabled{opacity:.3}
+.pending-animation{width:29px;height:29px;border:3px solid #e1e9f2;border-top-color:#337fca;border-radius:50%;animation:turn 1s linear infinite;margin:20px auto}
+@keyframes turn{to{transform:rotate(360deg)}}.secondary-action{padding:10px 14px;border-radius:11px;border:1px solid #d1dbe6;background:white;color:#3e6795}
+.sheet select{appearance:none;-webkit-appearance:none;background:#f7f9fb;color:#233447;border:1px solid #cfd9e3;min-height:48px;height:48px;box-shadow:none;background-image:none}
+.report-period{text-align:center;font-weight:700;font-size:18px;margin:15px 0}.primary:disabled{opacity:.6}
