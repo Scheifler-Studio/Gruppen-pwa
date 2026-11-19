@@ -12,6 +12,27 @@ function updateSidebarMonth(){const el=$('sidebarMonthLabel');if(el)el.textConte
 updateSidebarMonth();
 const roleTitle=r=>r==='leader'?'Ответственный за группу':r==='assistant'?'Помощник ответственного':'—';
 function showToast(t){$('toast').textContent=t;$('toast').hidden=false;setTimeout(()=>$('toast').hidden=true,4000)}
+let backgroundSaveCount=0;
+function saveInBackground(task,onSuccess,onError){
+ backgroundSaveCount++;
+ showToast('Отправляется на сервер…');
+ Promise.resolve().then(task).then(async result=>{
+   backgroundSaveCount--;
+   showToast('Сохранено на сервере');
+   if(onSuccess)await onSuccess(result);
+ }).catch(err=>{
+   backgroundSaveCount--;
+   showSaveFailure(err,()=>saveInBackground(task,onSuccess,onError));
+   if(onError)onError(err);
+ });
+}
+function showSaveFailure(error,retry){
+ const box=$('saveFailure');
+ $('saveFailureMessage').textContent='Не удалось сохранить на сервере: '+String(error?.message||error)+'. Данные не подтверждены. Попробуй повторить.';
+ box.hidden=false;
+ $('saveRetry').onclick=()=>{box.hidden=true;retry()};
+ $('saveFailureClose').onclick=()=>{box.hidden=true};
+}
 function openModal(title,html){$('dialogTitle').textContent=title;$('dialogBody').innerHTML=html;$('backdrop').hidden=false}function closeModal(){$('backdrop').hidden=true;$('dialogBody').innerHTML=''}
 let connectTimer=null;
 function showConnectionProgress(){
@@ -21,7 +42,7 @@ function showConnectionProgress(){
 function finishConnectionProgress(error){
  clearInterval(connectTimer);connectTimer=null;
  if(error){$('connectSpinner').hidden=true;$('connectTitle').textContent='Не удалось подключиться';$('connectDescription').textContent='Проверь адрес и доступ к серверу.';$('connectError').textContent=String(error.message||error);$('connectError').hidden=false;$('connectElapsed').hidden=true;$('connectDismiss').hidden=false;return;}
- $('connectOverlay').classList.add('success');$('connectSpinner').hidden=true;$('connectTitle').textContent='Сервер подключён';$('connectDescription').textContent='Соединение установлено';$('connectElapsed').hidden=true;setTimeout(()=>{if(!$('connectOverlay').hidden){$('connectOverlay').hidden=true;closeModal()}},650);
+ $('connectOverlay').classList.add('success');$('connectSpinner').hidden=true;$('connectTitle').textContent='Сервер подключён';$('connectDescription').textContent='Соединение установлено';$('connectElapsed').hidden=true;setTimeout(()=>{if(!$('connectOverlay').hidden){$('connectOverlay').hidden=true}},650);
 }
 $('connectDismiss').onclick=()=>$('connectOverlay').hidden=true;
 function saveSettings(){localStorage.setItem(LS,JSON.stringify(settings))}
@@ -94,17 +115,18 @@ function showSettings(){
   if(changed){settings.scriptUrl=url;saveSettings();token='';sessionStorage.removeItem(sessionKey);localStorage.removeItem(sessionKey);initBridge(url)}
   else if(!GoogleBridge.ready)initBridge(url);
   $('googleStatus').textContent='Проверка Google Drive…';
-  if(runLogin){$('connectGoogle').disabled=true;showConnectionProgress()}
+  const submittedPassword=runLogin?form.elements.password.value:'';
+  if(runLogin){$('connectGoogle').disabled=true;showConnectionProgress();closeModal()}
   try{
    if(runLogin) {
-     await loginAndTest(form.elements.password.value);
+     await loginAndTest(submittedPassword);
      finishConnectionProgress(null);
    } else {
      await GoogleBridge.call('ping',{});
-     $('googleStatus').textContent='Скрипт доступен. Для записи войди с паролем.';
-     if(token){const test=await loginAndTest('');$('googleStatus').textContent='Подключено: '+test.folder}
+     if($('googleStatus'))$('googleStatus').textContent='Скрипт доступен. Для записи войди с паролем.';
+     if(token){const test=await loginAndTest('');if($('googleStatus'))$('googleStatus').textContent='Подключено: '+test.folder}
    }
-  }catch(e){connected=false;$('googleStatus').textContent='Ошибка: '+e.message;statusText('Сервер недоступен');if(runLogin)finishConnectionProgress(e);else showToast(e.message)}
+  }catch(e){connected=false;if($('googleStatus'))$('googleStatus').textContent='Ошибка: '+e.message;statusText('Сервер недоступен');if(runLogin)finishConnectionProgress(e);else showToast(e.message)}
   finally{const b=$('connectGoogle');if(b)b.disabled=false}
  }
  form.onsubmit=e=>{e.preventDefault();submitSettings(true)};
@@ -120,8 +142,17 @@ function showSettings(){
   }catch(e){showToast(e.message)}
  };
 }
-function showGroup(){if(!checkConnection())return;openModal('Новая группа','<form id="groupForm"><label class="field">Название группы<input name="name" required maxlength="100" placeholder="Например, A1"></label><div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Создать</button></div></form>');$('cancel').onclick=closeModal;$('groupForm').onsubmit=async e=>{e.preventDefault();try{await post('/api/admin/group',{name:e.target.elements.name.value.trim()});closeModal();await refresh()}catch(e){showToast(e.message)}}}
-function showMember(m=null){if(!checkConnection())return;if(!groups.length){showToast('Сначала создай группу');return}const grp=m?.groupId||(['all','none'].includes(selected)?groups[0].id:selected),role=m?.role||'';openModal(m?'Карточка участника':'Новый участник',`<form id="memberForm" class="compact-member-form"><div class="member-name-row"><label class="field">Имя<input required name="firstName" value="${esc(m?.firstName||'')}"></label><label class="field">Фамилия<input required name="lastName" value="${esc(m?.lastName||'')}"></label></div><div class="pair"><label class="field">Группа<select name="groupId">${groups.map(g=>`<option value="${esc(g.id)}" ${g.id===grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><label class="field">Назначить<select name="role"><option value="">Выбрать</option><option value="leader" ${role==='leader'?'selected':''}>Ответственный за группу</option><option value="assistant" ${role==='assistant'?'selected':''}>Помощник</option></select></label></div><label id="codeField" class="field" ${role?'':'hidden'}>Одноразовый код для телефона (4 цифры)<input name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="Например, 4827"><span class="hint">Код нужен для новой регистрации; можно оставить пустым при редактировании без смены должности.</span></label><label class="field">Адрес<textarea name="address" rows="2">${esc(m?.address||'')}</textarea></label><div class="member-phone-service-row"><label class="field">Телефон<input name="phone" type="tel" value="${esc(m?.phone||'')}"></label><label class="field">Вид служения<select name="category"><option value="">Не указана</option>${serviceTypes.map(x=>`<option ${m?.category===x?'selected':''}>${x}</option>`).join('')}</select></label></div>${m?`<p class="hint">Дата создания: ${esc(date(m.addedAt))}<br>Файл: ${esc(m.fileName||'')}</p>`:''}${m?`<div class="archive-area"><button type="button" class="archive-action" id="archiveMember">Удалить участника</button></div>`:''}<div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Сохранить</button></div></form>`);const form=$('memberForm');form.elements.role.onchange=()=>{const has=!!form.elements.role.value;$('codeField').hidden=!has;form.elements.code.required=has&&(!m||m.role!==form.elements.role.value||m.groupId!==form.elements.groupId.value)};form.elements.groupId.onchange=()=>form.elements.role.onchange();form.elements.role.onchange();$('cancel').onclick=closeModal;if(m){$('archiveMember').onclick=()=>{openModal('Удаление участника',`<p>Вы действительно хотите удалить из активного списка <strong>${esc(m.lastName)} ${esc(m.firstName)}</strong>?</p><p class="hint">JSON и прежние отчёты останутся на Google Drive. Если участник имеет назначение, доступ его телефона будет отозван.</p><div class="actions"><button class="secondary" id="archiveCancel" type="button">Отмена</button><button class="danger-button" id="archiveConfirm" type="button">Удалить</button></div>`);$('archiveCancel').onclick=()=>showMember(m);$('archiveConfirm').onclick=async()=>{const b=$('archiveConfirm');b.disabled=true;b.textContent='Удаление…';try{await post('/api/admin/archive',{memberId:m.id});members=members.filter(x=>x.id!==m.id);closeModal();render();showToast('Участник удалён из активного списка');await refresh()}catch(ex){b.disabled=false;b.textContent='Удалить';showToast(ex.message)}}}};form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget.elements,obj={id:m?.id,firstName:f.firstName.value.trim(),lastName:f.lastName.value.trim(),groupId:f.groupId.value,role:f.role.value,code:f.code.value.trim(),address:f.address.value.trim(),phone:f.phone.value.trim(),category:f.category.value,categoryMonth:$('reportMonth').value,addedAt:m?.addedAt,fileName:m?.fileName};if(obj.role&&(!m||m.role!==obj.role||m.groupId!==obj.groupId)&&!obj.code)return showToast('При новом назначении укажи одноразовый код');try{await post('/api/admin/member',{member:obj});closeModal();await refresh();showToast('Участник сохранён')}catch(e){if(e.status===409&&e.data?.conflict){const yes=confirm(`В этой группе уже назначен(а) ${e.data.conflict.name}.\n\nПосле подтверждения предыдущий участник потеряет эту должность и доступ со своего телефона. Продолжить?`);if(yes){try{await post('/api/admin/member',{member:obj,replaceRole:true});closeModal();await refresh();showToast('Назначение изменено')}catch(x){showToast(x.message)}}}else showToast(e.message)}}}
+function showGroup(){if(!checkConnection())return;openModal('Новая группа','<form id="groupForm"><label class="field">Название группы<input name="name" required maxlength="100" placeholder="Например, A1"></label><div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Создать</button></div></form>');$('cancel').onclick=closeModal;$('groupForm').onsubmit=e=>{e.preventDefault();const name=e.currentTarget.elements.name.value.trim();if(!name)return;closeModal();saveInBackground(()=>post('/api/admin/group',{name}),()=>refresh())}}
+function showMember(m=null){if(!checkConnection())return;if(!groups.length){showToast('Сначала создай группу');return}const grp=m?.groupId||(['all','none'].includes(selected)?groups[0].id:selected),role=m?.role||'';openModal(m?'Карточка участника':'Новый участник',`<form id="memberForm" class="compact-member-form"><div class="member-name-row"><label class="field">Имя<input required name="firstName" value="${esc(m?.firstName||'')}"></label><label class="field">Фамилия<input required name="lastName" value="${esc(m?.lastName||'')}"></label></div><div class="pair"><label class="field">Группа<select name="groupId">${groups.map(g=>`<option value="${esc(g.id)}" ${g.id===grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><label class="field">Назначить<select name="role"><option value="">Выбрать</option><option value="leader" ${role==='leader'?'selected':''}>Ответственный за группу</option><option value="assistant" ${role==='assistant'?'selected':''}>Помощник</option></select></label></div><label id="codeField" class="field" ${role?'':'hidden'}>Одноразовый код для телефона (4 цифры)<input name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="Например, 4827"><span class="hint">Код нужен для новой регистрации; можно оставить пустым при редактировании без смены должности.</span></label><label class="field">Адрес<textarea name="address" rows="2">${esc(m?.address||'')}</textarea></label><div class="member-phone-service-row"><label class="field">Телефон<input name="phone" type="tel" value="${esc(m?.phone||'')}"></label><label class="field">Вид служения<select name="category"><option value="">Не указана</option>${serviceTypes.map(x=>`<option ${m?.category===x?'selected':''}>${x}</option>`).join('')}</select></label></div>${m?`<p class="hint">Дата создания: ${esc(date(m.addedAt))}<br>Файл: ${esc(m.fileName||'')}</p>`:''}${m?`<div class="archive-area"><button type="button" class="archive-action" id="archiveMember">Удалить участника</button></div>`:''}<div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Сохранить</button></div></form>`);const form=$('memberForm');form.elements.role.onchange=()=>{const has=!!form.elements.role.value;$('codeField').hidden=!has;form.elements.code.required=has&&(!m||m.role!==form.elements.role.value||m.groupId!==form.elements.groupId.value)};form.elements.groupId.onchange=()=>form.elements.role.onchange();form.elements.role.onchange();$('cancel').onclick=closeModal;if(m){$('archiveMember').onclick=()=>{openModal('Удаление участника',`<p>Вы действительно хотите удалить из активного списка <strong>${esc(m.lastName)} ${esc(m.firstName)}</strong>?</p><p class="hint">JSON и прежние отчёты останутся на Google Drive. Если участник имеет назначение, доступ его телефона будет отозван.</p><div class="actions"><button class="secondary" id="archiveCancel" type="button">Отмена</button><button class="danger-button" id="archiveConfirm" type="button">Удалить</button></div>`);$('archiveCancel').onclick=()=>showMember(m);$('archiveConfirm').onclick=async()=>{const b=$('archiveConfirm');b.disabled=true;b.textContent='Удаление…';try{await post('/api/admin/archive',{memberId:m.id});members=members.filter(x=>x.id!==m.id);closeModal();render();showToast('Участник удалён из активного списка');await refresh()}catch(ex){b.disabled=false;b.textContent='Удалить';showToast(ex.message)}}}};form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget.elements,obj={id:m?.id,firstName:f.firstName.value.trim(),lastName:f.lastName.value.trim(),groupId:f.groupId.value,role:f.role.value,code:f.code.value.trim(),address:f.address.value.trim(),phone:f.phone.value.trim(),category:f.category.value,categoryMonth:$('reportMonth').value,addedAt:m?.addedAt,fileName:m?.fileName};if(obj.role&&(!m||m.role!==obj.role||m.groupId!==obj.groupId)&&!obj.code)return showToast('При новом назначении укажи одноразовый код');closeModal();
+ const send=replaceRole=>post('/api/admin/member',{member:obj,...(replaceRole?{replaceRole:true}:{})});
+ saveInBackground(()=>send(false),()=>refresh(),err=>{
+   if(err.status===409&&err.data?.conflict){
+     $('saveFailure').hidden=true;
+     const yes=confirm(`В этой группе уже назначен(а) ${err.data.conflict.name}.\n\nПосле подтверждения предыдущий участник потеряет должность и доступ со своего телефона. Продолжить?`);
+     if(yes)saveInBackground(()=>send(true),()=>refresh());
+   }
+ });
+}}
 function editAdminReport(m){
  if(!checkConnection())return;
  const defaultMonth=prevMonth();let selectedMonth=defaultMonth,activeReport=reports.find(x=>String(x.memberId)===String(m.id)&&x.month===defaultMonth)||{};
@@ -137,7 +168,7 @@ function editAdminReport(m){
    catch(err){showToast('Не удалось загрузить месяц: '+err.message);}
    finally{if(f===$('adminReportForm')){f.elements.month.disabled=false;save.disabled=false}}
  };
- f.onsubmit=e=>{e.preventDefault();const b=f.querySelector('[type=submit]');if(b.disabled)return;const item={memberId:m.id,month:f.elements.month.value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};b.disabled=true;b.textContent='Сохранение…';post('/api/admin/report',item).then(async()=>{closeModal();if(item.month===$('reportMonth').value){reports=reports.filter(x=>String(x.memberId)!==String(m.id));reports.push({...item,answer:['V','UV'].includes(item.category)?item.answer:null})}render();showToast('Отчёт сохранён');await refresh()}).catch(err=>{b.disabled=false;b.textContent='Сохранить';showToast(err.message)})};
+ f.onsubmit=e=>{e.preventDefault();const b=f.querySelector('[type=submit]');if(b.disabled)return;const item={memberId:m.id,month:f.elements.month.value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};closeModal();saveInBackground(()=>post('/api/admin/report',item),async()=>{if(item.month===$('reportMonth').value){reports=reports.filter(x=>String(x.memberId)!==String(m.id));reports.push({...item,answer:['V','UV'].includes(item.category)?item.answer:null})}render();await refresh()})};
 }
 function showGroupExport(){
  if(selected==='all'||selected==='none')return;
