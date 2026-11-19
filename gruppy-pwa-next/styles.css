@@ -158,3 +158,50 @@
 .connect-overlay.success .connect-card h3{color:#18864a}
 @media(max-width:1180px){.members.values-visible .member-line,.members.values-visible .value-head{grid-template-columns:110px minmax(200px,1fr) 56px 70px 72px 60px minmax(95px,.7fr) 44px}.members.values-visible .value-head>span{font-size:15px}}
 @media(max-width:850px){.members.values-visible .member-line,.members.values-visible .value-head{min-width:770px;width:770px;grid-template-columns:96px 225px 51px 65px 69px 57px 160px 47px}.members.values-visible .member-line>.chip{font-size:16px}.members.values-visible .name-cell .name{font-size:18px}.members.values-visible .value-head .month-heading{font-size:19px}}
+
+/* v23 — dense rows, stable name position and calendar without text input box */
+.members .member-line{min-height:54px;padding-left:9px;padding-right:9px}
+.members.values-visible .member-line{min-height:52px}
+.members .member-line .chip{padding:7px 11px;font-size:17px;line-height:1.1;margin:0 7px 0 0;flex:none}
+.members .member-line .name-cell{padding-left:0;padding-right:0;gap:4px}
+.members .member-line .name-cell .name{font-size:20px}
+.members .member .more{width:34px;height:34px;min-width:34px}
+/* The group and name never jump when report columns are expanded. */
+.members.values-visible .member-line,.members.values-visible .value-head{
+ grid-template-columns:72px var(--name-column,270px) 54px 66px 70px 56px minmax(100px,1fr) 48px;
+ min-width:760px;width:100%;padding-left:9px;padding-right:9px;gap:0;
+}
+.members.values-visible .member-line .chip{justify-self:start;margin:0}
+.members.values-visible .member-line .name-cell{justify-self:start;width:100%;overflow:visible}
+.members.values-visible .member-line .name-cell .name{font-size:20px;overflow:hidden;text-overflow:ellipsis}
+.members.values-visible .value-head{min-height:52px}
+.members.values-visible .value-head .month-heading{font-size:21px;padding-left:3px}
+.members.values-visible .value-head>.more-heading,
+.members.values-visible .member-line>.more{border-left:1px solid #bcc9d8}
+.members.values-visible .member-line>.more{width:100%;height:100%;background:transparent;border-radius:0;display:grid;place-items:center;font-size:0}
+.members.values-visible .member-line>.more::before{content:'···';font-size:17px;line-height:34px;text-align:center;color:#fff;background:#b5bfcd;width:34px;height:34px;border-radius:50%}
+.members.values-visible .member-line>.more:hover::before{background:#9fabba}
+.members.values-visible .member-line>.status-cell,
+.members.values-visible .member-line>.value-service,
+.members.values-visible .member-line>.value-result,
+.members.values-visible .member-line>.value-studies,
+.members.values-visible .member-line>.value-note{padding:2px 3px}
+.members.values-visible .member-line>.value-note{justify-content:center}
+/* Keep each column line continuous from the sticky heading to the list bottom. */
+.members.values-visible .value-head>.status-heading,
+.members.values-visible .value-head>.value-service-head,
+.members.values-visible .value-head>.value-result-head,
+.members.values-visible .value-head>.value-studies-head,
+.members.values-visible .value-head>.value-note-head,
+.members.values-visible .value-head>.more-heading{border-left:1px solid #bcc9d8}
+.report-month-display{display:flex;align-items:center;gap:12px;margin:0 0 19px;min-height:48px}
+.report-month-display>span{font-size:25px;font-weight:800;color:#17293d;line-height:1.1}
+.calendar-month-action{position:relative;display:grid;place-items:center;flex:none;width:44px;height:44px;cursor:pointer;border-radius:11px;background:#edf3fb;border:1px solid #c5d1e0}
+.calendar-month-action svg{width:29px;height:29px;fill:none;stroke:#346eac;stroke-width:2;pointer-events:none}
+.calendar-month-action input[type="month"]{position:absolute;inset:0;width:100%;height:100%;padding:0;margin:0;opacity:0;cursor:pointer;border:0;z-index:1}
+@media(max-width:1180px){
+ .members.values-visible .member-line,.members.values-visible .value-head{grid-template-columns:72px var(--name-column,270px) 54px 66px 70px 56px minmax(100px,1fr) 48px}
+}
+@media(max-width:850px){
+ .members.values-visible .member-line,.members.values-visible .value-head{min-width:760px;width:760px;grid-template-columns:72px 265px 54px 66px 70px 56px minmax(100px,1fr) 48px}
+}
