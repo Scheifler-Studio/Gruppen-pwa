@@ -1,1 +1,22 @@
-const C='gruppen-ipad-v34';self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['./','./index.html','./app.js?v=34','./group-export.js?v=34','./bridge-client.js?v=34','./styles.css?v=34','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'])));self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(async ks=>Promise.all(ks.filter(x=>x.startsWith('gruppen-ipad-')&&x!==C).map(x=>caches.delete(x)))));self.clients.claim()});self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==location.origin)return;e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{if(r.ok){const c=r.clone();caches.open(C).then(cache=>cache.put(e.request,c))}return r}).catch(()=>caches.match(e.request)))})
+const CACHE='gruppen-ipad-v35';
+const FILES=['./','./index.html','./app.js?v=35','./group-export.js?v=35','./bridge-client.js?v=35','./styles.css?v=35','./manifest.webmanifest','./version.json','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
+self.addEventListener('install',event=>{
+ event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));
+});
+self.addEventListener('activate',event=>{
+ event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('gruppen-ipad-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch',event=>{
+ const request=event.request,url=new URL(request.url);
+ if(request.method!=='GET'||url.origin!==self.location.origin)return;
+ // Network-first means an installed Home Screen PWA sees newly deployed files.
+ event.respondWith(fetch(request,{cache:'no-store'}).then(response=>{
+  if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put(request,copy)));}
+  return response;
+ }).catch(async()=>{
+  const cached=await caches.match(request);
+  if(cached)return cached;
+  if(request.mode==='navigate')return caches.match('./index.html');
+  return Response.error();
+ }));
+});

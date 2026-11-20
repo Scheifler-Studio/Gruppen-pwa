@@ -322,7 +322,52 @@ $('pending').onclick=async e=>{const btn=e.target.closest('[data-approve],[data-
  try{await post('/api/admin/pending/decision',{id,approve});showToast(approve?'Подтверждено':'Отклонено');await refresh()}
  catch(ex){pending=original;render();showToast('Не удалось сохранить решение: '+ex.message)}
 };document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+// PWA update management. Data/session keys remain untouched.
+const APP_VERSION=35;
+let swRegistration=null, updateInProgress=false, updateReloadPending=false;
+function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
+function applyPwaUpdate(){
+ if(updateReloadPending || pageBusyForUpdate())return;
+ updateReloadPending=true;
+ // Avoid a loop if iOS temporarily serves the old app shell from its cache.
+ const k='gruppen-ipad-v35-last-reload';
+ const last=Number(sessionStorage.getItem(k)||0);
+ if(Date.now()-last<15000){updateReloadPending=false;return;}
+ sessionStorage.setItem(k,String(Date.now()));
+ window.location.reload();
+}
+async function checkPwaUpdate(){
+ if(updateInProgress || !navigator.onLine)return;
+ updateInProgress=true;
+ try{
+  const res=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});
+  if(!res.ok)return;
+  const remote=await res.json();
+  if(Number(remote.version)>APP_VERSION){
+   if(swRegistration)await swRegistration.update();
+   if(navigator.serviceWorker.controller && !pageBusyForUpdate())applyPwaUpdate();
+  }
+ }catch(e){/* Offline: keep the locally installed app working. */}
+ finally{updateInProgress=false;}
+}
+if('serviceWorker'in navigator){
+ const hadController=Boolean(navigator.serviceWorker.controller);
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+   // Only refresh after an upgrade, not on the very first installation.
+   if(hadController)applyPwaUpdate();
+ });
+ navigator.serviceWorker.register('./sw.js?v=35',{updateViaCache:'none'}).then(async r=>{
+  swRegistration=r;
+  try{await r.update();}catch(e){}
+  checkPwaUpdate();
+ }).catch(()=>{});
+ document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){if(updateReloadPending)applyPwaUpdate();checkPwaUpdate();if(swRegistration)swRegistration.update().catch(()=>{});}
+ });
+ window.addEventListener('pageshow',()=>{checkPwaUpdate();});
+ setInterval(()=>{if(!document.hidden){checkPwaUpdate();if(swRegistration)swRegistration.update().catch(()=>{});}},5*60*1000);
+}
+
 try{const old=JSON.parse(localStorage.getItem(older)||'{}');if(Array.isArray(old.groups)&&Array.isArray(old.members)&&old.groups.length){groups=old.groups;members=old.members;localPreview=true}}catch{}
 statusText('Сервер недоступен');render();
 if(settings.scriptUrl){try{initBridge(settings.scriptUrl);if(token){GoogleBridge.subscribe(state=>{if(state==='ready'&&!connected){loginAndTest('').catch(e=>{statusText('Требуется вход');showToast(e.message)})}})}}catch(e){statusText('Некорректная ссылка Google')}}
