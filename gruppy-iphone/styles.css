@@ -246,3 +246,12 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .contact-actions{display:flex;gap:12px;margin-top:20px}.contact-actions button{flex:1;padding:13px;border:1px solid #dce2e9;border-radius:10px}
 .contact-choices button{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid #d8dde5;padding:13px 4px;color:#1b2b3a}
 .reminder-brand{display:flex;align-items:center;gap:12px;padding:12px 0}.reminder-brand img{width:52px;height:52px;border-radius:13px}.reminder-brand strong{font-size:23px}
+
+/* v33 — Per-member contact sync never blocks another edit. */
+#members .member-row .contact-sync{flex:0 0 22px;width:22px;height:22px;display:grid;place-items:center;align-self:center;margin-right:3px;border:0;border-radius:50%;font-size:15px;font-weight:750;box-sizing:border-box}
+#members .contact-sync.is-sending{background:#e7edf6;color:#5e748a}
+#members .contact-spinner{width:14px;height:14px;border-radius:50%;border:2px solid #c2cfdd;border-top-color:#4f718e;animation:contact-spin .8s linear infinite}
+@keyframes contact-spin{to{transform:rotate(360deg)}}
+#members .contact-sync.is-success{background:#2b9553;color:#fff}
+#members .contact-sync.is-error{background:#fce3e3;color:#af2731;cursor:pointer}
+@media(prefers-reduced-motion:reduce){#members .contact-spinner{animation-duration:1.8s}}

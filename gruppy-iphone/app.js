@@ -2,6 +2,68 @@
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const KEY='gruppen-duo-iphone';let settings=JSON.parse(localStorage.getItem(KEY)||'{}'),members=[],reports=[],order=[],group='',person='',myRole='';
 let reorderMode=false,requesting=false,refreshing=false,pendingTimer=null,reminderTimer=null;const OUTBOX_KEY='gruppen-iphone-report-outbox-v20';let outbox=[];try{outbox=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');if(!Array.isArray(outbox))outbox=[]}catch{outbox=[]}let sendingOutbox=false;const SNAPSHOT_KEY='gruppen-iphone-bootstrap-cache-v31';let lastSendErrorAt=0;
+// Contact edits are optimistic and stored separately from the existing report outbox.
+// Multiple members may be edited while an earlier change is awaiting a server response.
+const CONTACT_OUTBOX_KEY='gruppen-iphone-contacts-outbox-v33';
+let contactOutbox=[];try{contactOutbox=JSON.parse(localStorage.getItem(CONTACT_OUTBOX_KEY)||'[]');if(!Array.isArray(contactOutbox))contactOutbox=[]}catch{contactOutbox=[]}
+let sendingContacts=false,contactSendFailedAt=0;const contactSuccess=new Map(),contactErrors=new Map();
+function saveContacts(){localStorage.setItem(CONTACT_OUTBOX_KEY,JSON.stringify(contactOutbox))}
+function contactPending(id){return contactOutbox.some(x=>x.memberId===id)}
+function showContactStatus(id){
+ const safe=esc(id),pending=contactPending(id);
+ if(pending)return `<span class="contact-sync is-sending" role="status" aria-label="Изменения отправляются" title="Изменения ожидают отправки"><span class="contact-spinner"></span></span>`;
+ if(contactErrors.has(id))return `<button type="button" class="contact-sync is-error" data-retry-contact="${safe}" title="Ошибка сохранения. Нажмите для повтора" aria-label="Ошибка отправки. Повторить">!</button>`;
+ if(contactSuccess.has(id))return `<span class="contact-sync is-success" aria-label="Данные сохранены" title="Сохранено">✓</span>`;
+ return '';
+}
+function applyPendingContacts(){
+ for(const entry of contactOutbox){
+  let member=members.find(m=>m.id===entry.memberId);
+  if(!member&&entry.action==='phoneAddMember'){member={id:entry.memberId,groupId:group||'',role:'',category:entry.data.category||'V'};members.push(member)}
+  if(member)Object.assign(member,entry.data,{id:entry.memberId});
+ }
+}
+function cacheSnapshot(){try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({token:settings.token,members,reports,order,group,person,myRole,month:$('month').value}))}catch{}}
+function permanentContactError(err){return /недействител|отозван|не найден|не подтвержден|нет прав|доступ запрещ|некоррект|укажи фамилию|нужны имя|превышен предел|invalid|permission|registration|auth/i.test(String(err?.message||''))}
+async function flushContactOutbox(){
+ if(sendingContacts||!settings.token||!contactOutbox.length||!navigator.onLine)return;
+ sendingContacts=true;
+ try{
+  while(contactOutbox.length){
+   const entry=contactOutbox[0];
+   try{
+    const result=await phoneCall(entry.action,entry.data);
+    contactOutbox.shift();saveContacts();contactSendFailedAt=0;
+    if(entry.action==='phoneAddMember'&&result?.memberId){
+     const member=members.find(m=>m.id===entry.memberId);if(member)member.id=result.memberId;
+     // Another edit could have been queued for the newly added participant.
+     for(const pending of contactOutbox){if(pending.memberId===entry.memberId){pending.memberId=result.memberId;pending.data.memberId=result.memberId}}
+     saveContacts();
+    }
+    const id=entry.action==='phoneAddMember'?(result?.memberId||entry.memberId):entry.memberId;
+    if(!contactPending(id)){
+     contactErrors.delete(id);contactSuccess.set(id,Date.now());
+     setTimeout(()=>{if(contactSuccess.get(id)&&Date.now()-contactSuccess.get(id)>=4800){contactSuccess.delete(id);render()}},5100);
+    }
+    cacheSnapshot();render();
+    // Fetch server data only after queue drains to avoid replacing unsent local edits.
+   }catch(err){
+    if(permanentContactError(err)){
+     contactOutbox.shift();saveContacts();
+     contactErrors.set(entry.memberId,err.message||'Сервер отклонил изменение');
+     if(entry.action==='phoneAddMember')members=members.filter(x=>x.id!==entry.memberId);
+     else if(entry.before){const member=members.find(x=>x.id===entry.memberId);if(member&&!contactPending(entry.memberId))Object.assign(member,entry.before)}
+     applyPendingContacts();cacheSnapshot();render();
+     notice('Изменения не приняты сервером: '+(err.message||'Ошибка')+'. Проверьте данные.');
+     continue;
+    }
+    contactSendFailedAt=Date.now();render();
+    notice('Нет связи с сервером. Изменения сохранены на телефоне и будут отправлены повторно.');
+    break;
+   }
+  }
+ }finally{sendingContacts=false}
+}
 const serviceTypes=['APV','HPV','HPV-30','HPV-60','HPV-90','V','UV'];
 const months=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 function prevMonth(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
@@ -37,7 +99,7 @@ function render(){
   const state=stateById.get(m.id),role=m.role==='leader'?'leader':m.role==='assistant'?'assistant':'';
   const rowTone=state.cls==='done'?'reported':day<=10?'waiting':'overdue';
   const suffix='';
-  return `<div class="member-row ${rowTone}" data-member="${esc(m.id)}" title="${esc(state.label+suffix)}"><div class="member-details"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span></span><button type="button" class="member-action" data-edit="${esc(m.id)}" aria-label="Внести отчёт: ${esc(m.lastName)} ${esc(m.firstName)}"><span aria-hidden="true">•••</span></button></div>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`;
+  return `<div class="member-row ${rowTone}" data-member="${esc(m.id)}" title="${esc(state.label+suffix)}"><div class="member-details"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span></span>${showContactStatus(m.id)}<button type="button" class="member-action" data-edit="${esc(m.id)}" aria-label="Внести отчёт: ${esc(m.lastName)} ${esc(m.firstName)}"><span aria-hidden="true">•••</span></button></div>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`;
  }).join('')||'<div class="empty">В группе пока нет участников.</div>';
 }
 
@@ -46,7 +108,7 @@ async function refresh(){if(!settings.token){show('login');return}if(refreshing)
  if(d.status==='pending'){show('pending');$('pendingText').textContent='Ваш код отправлен. В ближайшее время заявка будет рассмотрена.';return}
  if(d.status==='rejected'){settings.token='';save();show('login');notice('Регистрация отклонена. Обратитесь к секретарю.');return}
  if(d.status!=='approved')throw Error('Нет подтверждения регистрации');
- members=Array.isArray(d.members)?d.members:[];reports=Array.isArray(d.reports)?d.reports:[];order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.role||'';try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({token:settings.token,members,reports,order,group,person,myRole,month:$('month').value}))}catch(e){console.warn('Кэш недоступен',e)}show('active');render();showMonthlyReminder();flushOutbox();flushReminderAcks();decemberReminder();
+ members=Array.isArray(d.members)?d.members:[];applyPendingContacts();reports=Array.isArray(d.reports)?d.reports:[];order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.role||'';try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({token:settings.token,members,reports,order,group,person,myRole,month:$('month').value}))}catch(e){console.warn('Кэш недоступен',e)}show('active');render();showMonthlyReminder();flushContactOutbox();flushOutbox();flushReminderAcks();decemberReminder();
  }catch(e){if(/недействител|отозван|не найден|отклонен|отклонён|Регистрация удалена/i.test(e.message)){settings.token='';save();show('login');notice(e.message)}else {if(members.length||!$('active').hidden){show('active');render();notice('Нет интернета. Данные доступны, отчёты будут отправлены при подключении.')}else notice('Нет связи с Google Drive: '+e.message)}}finally{refreshing=false}}
 function showMonthlyReminder(){const now=new Date(),monthKey=`${now.getFullYear()}-${now.getMonth()+1}`;if(now.getDate()!==1||now.getHours()<10)return;
  if(localStorage.getItem('gruppen-month-reminder')===monthKey)return;
@@ -99,7 +161,7 @@ function loadOfflineSnapshot(){
   if(!d||d.token!==settings.token||!Array.isArray(d.members))return false;
   members=d.members;reports=Array.isArray(d.reports)?d.reports:[];
   order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.myRole||'';
-  show('active');render();decemberReminder();return true;
+  applyPendingContacts();show('active');render();decemberReminder();return true;
  }catch{return false}
 }
 
@@ -115,8 +177,21 @@ function memberFormHtml(m){
  return `<form id="contactForm" class="contact-form"><div class="contact-name-row"><label>Имя<input required name="firstName" maxlength="120" value="${val('firstName')}"></label><label>Фамилия<input required name="lastName" maxlength="120" value="${val('lastName')}"></label></div><label>Адрес<textarea name="address" rows="2">${val('address')}</textarea></label><label>Телефон 1<input name="phone" type="tel" value="${val('phone')}"></label><label>Телефон 2<input name="phone2" type="tel" value="${val('phone2')}"></label><div class="contact-divider">Доверительное лицо</div><div class="contact-name-row"><label>Имя<input name="trustedFirstName" value="${val('trustedFirstName')}"></label><label>Фамилия<input name="trustedLastName" value="${val('trustedLastName')}"></label></div><label>Телефон доверительного лица<input name="trustedPhone" type="tel" value="${val('trustedPhone')}"></label>${!m?`<label>Вид служения<select name="category"><option value="">Выбрать</option>${serviceTypes.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>`:''}<p class="hint">Группа ${esc(group)}. Назначения изменяет секретарь.</p><div id="error" class="error" hidden></div><button class="primary" type="submit">Сохранить</button></form>`;
 }
 function editMemberContact(m=null){$('groupSettings').hidden=true;openSheet(m?'Редактировать участника':'Новый участник',memberFormHtml(m));
- $('contactForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('[type=submit]');const data={};for(const k of contactFields)data[k]=f.elements[k].value.trim();if(!m)data.category=f.elements.category.value;else data.memberId=m.id;
- btn.disabled=true;btn.textContent='Отправляется…';try{await phoneCall(m?'phoneUpdateMember':'phoneAddMember',data);closeSheet();await refresh();notice(m?'Изменения отправлены секретарю':'Участник добавлен. Секретарь получит уведомление')}catch(err){btn.disabled=false;btn.textContent='Сохранить';$('error').hidden=false;$('error').textContent=err.message}}
+ $('contactForm').onsubmit=e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('[type=submit]');if(btn.disabled)return;const data={};for(const k of contactFields)data[k]=f.elements[k].value.trim();if(!m)data.category=f.elements.category.value;
+ if(!data.firstName||!data.lastName){$('error').hidden=false;$('error').textContent='Укажи фамилию и имя';return}
+ if(!m&&!serviceTypes.includes(data.category)){$('error').hidden=false;$('error').textContent='Выбери вид служения';return}
+ const id=m?.id||'local-'+Date.now()+'-'+Math.random().toString(36).slice(2),before=m?Object.fromEntries(contactFields.map(k=>[k,m[k]||''])):null;
+ if(m)data.memberId=id;
+ const entry={id:'edit-'+Date.now()+'-'+Math.random().toString(36).slice(2),memberId:id,action:m?'phoneUpdateMember':'phoneAddMember',data,before};
+ // When a new member is still local, update its queued creation instead of sending an invalid temporary member ID.
+ const create=contactOutbox.find(x=>x.memberId===id&&x.action==='phoneAddMember');
+ if(create){Object.assign(create.data,data);delete create.data.memberId}else contactOutbox.push(entry);
+ try{saveContacts()}catch(err){$('error').hidden=false;$('error').textContent='Не удалось сохранить на телефоне. Освободи место и повтори.';return}
+ if(m)Object.assign(m,data);else members.push({...data,id,groupId:group,role:''});
+ contactErrors.delete(id);contactSuccess.delete(id);cacheSnapshot();closeSheet();render();
+ notice(navigator.onLine?'Изменения сохранены на телефоне. Отправляются…':'Изменения сохранены на телефоне. Отправим при появлении интернета.');
+ if(navigator.onLine)flushContactOutbox();
+ }
 }
 function addMember(){editMemberContact()}
 function viewMember(m){const fields=[['Имя',m.firstName],['Фамилия',m.lastName],['Адрес',m.address],['Телефон 1',m.phone],['Телефон 2',m.phone2],['Доверительное лицо', [m.trustedFirstName,m.trustedLastName].filter(Boolean).join(' ')],['Телефон доверительного лица',m.trustedPhone],['Вид служения',m.category]];
@@ -157,11 +232,11 @@ $('notifyToggle').onclick=()=>{if(!('Notification'in window)){notice('Уведо
 let touchStart=null;
 $('members').addEventListener('touchstart',e=>{const row=e.target.closest('[data-member]');if(row&&e.touches.length===1)touchStart={id:row.dataset.member,x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true});
 $('members').addEventListener('touchend',e=>{if(!touchStart||!e.changedTouches.length)return;const end=e.changedTouches[0],dx=end.clientX-touchStart.x,dy=end.clientY-touchStart.y,id=touchStart.id;touchStart=null;if(dx<-85&&Math.abs(dy)<50){const m=members.find(x=>x.id===id);if(m)removeMember(m)}},{passive:true});
-$('members').onclick=async e=>{const edit=e.target.closest('[data-edit]'),up=e.target.closest('[data-up]'),down=e.target.closest('[data-down]');if(edit&&!reorderMode){const m=members.find(x=>x.id===edit.dataset.edit);if(m)editReport(m);return}if(up||down){const id=up?.dataset.up||down.dataset.down;const sorted=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);return (ai<0?9999:ai)-(bi<0?9999:bi)});const index=sorted.findIndex(m=>m.id===id),next=index+(up?-1:1);if(next<0||next>=sorted.length)return;[sorted[index],sorted[next]]=[sorted[next],sorted[index]];const ids=sorted.map(m=>m.id);try{await phoneCall('phoneReorder',{ids});order=ids;render()}catch(ex){notice(ex.message)}}};
+$('members').onclick=async e=>{const retry=e.target.closest('[data-retry-contact]');if(retry){const id=retry.dataset.retryContact;contactErrors.delete(id);render();notice('Откройте участника и повторите сохранение');return}const edit=e.target.closest('[data-edit]'),up=e.target.closest('[data-up]'),down=e.target.closest('[data-down]');if(edit&&!reorderMode){const m=members.find(x=>x.id===edit.dataset.edit);if(m)editReport(m);return}if(up||down){const id=up?.dataset.up||down.dataset.down;const sorted=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);return (ai<0?9999:ai)-(bi<0?9999:bi)});const index=sorted.findIndex(m=>m.id===id),next=index+(up?-1:1);if(next<0||next>=sorted.length)return;[sorted[index],sorted[next]]=[sorted[next],sorted[index]];const ids=sorted.map(m=>m.id);try{await phoneCall('phoneReorder',{ids});order=ids;render()}catch(ex){notice(ex.message)}}};
 $('close').onclick=closeSheet;$('overlay').onclick=e=>{if(e.target===$('overlay'))closeSheet()};
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-connectBridge();if(settings.token){loadOfflineSnapshot();if(navigator.onLine)refresh();else notice('Работа без интернета: новые отчёты сохраняются на телефоне.')}else show('login');
-window.addEventListener('online',()=>{notice('Интернет восстановлен. Отправляем сохранённые отчёты…');flushOutbox().then(()=>{flushReminderAcks();refresh()})});
-setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden&&navigator.onLine){if(outbox.length){if(!lastSendErrorAt||Date.now()-lastSendErrorAt>60000)flushOutbox()}else refresh()}},30000);
+connectBridge();if(settings.token){loadOfflineSnapshot();if(navigator.onLine){flushContactOutbox();refresh()}else notice('Работа без интернета: новые отчёты сохраняются на телефоне.')}else show('login');
+window.addEventListener('online',()=>{notice('Интернет восстановлен. Отправляем сохранённые отчёты…');Promise.all([flushOutbox(),flushContactOutbox()]).then(()=>{flushReminderAcks();refresh()})});
+setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden&&navigator.onLine){if(contactOutbox.length&&(!contactSendFailedAt||Date.now()-contactSendFailedAt>60000))flushContactOutbox();if(outbox.length){if(!lastSendErrorAt||Date.now()-lastSendErrorAt>60000)flushOutbox()}else if(!contactOutbox.length)refresh()}},30000);
 setInterval(()=>{if(settings.token&&!document.hidden&&!$('active').hidden){showMonthlyReminder();decemberReminder();flushReminderAcks()}},60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){decemberReminder();flushReminderAcks()}});
