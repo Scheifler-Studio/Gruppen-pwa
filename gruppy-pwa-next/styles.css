@@ -297,3 +297,11 @@
 .group-filter-choice:hover{background:#f0f4f9}
 .group-filter-choice input{width:18px;height:18px;accent-color:#2769b5}
 .filter-color-dot{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid #b3c0cf}
+
+/* Version 32: closable iPhone-to-iPad notifications */
+.group-events-header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.group-events-header h3{margin:6px 0 9px;font-size:16px}
+.events-dismiss-all{background:#fff4ce;border:1px solid #d8c37c;border-radius:8px;padding:6px 10px;font-size:13px;color:#51431a;white-space:nowrap}
+.group-change{position:relative;padding-right:48px}
+.event-dismiss{position:absolute;top:5px;right:6px;display:grid;place-items:center;width:34px;height:34px;border:0;background:transparent;color:#483c20;font-size:26px;font-weight:400;line-height:1;border-radius:50%}
+.event-dismiss:hover,.event-dismiss:focus-visible{background:#f2dfab}

@@ -1,6 +1,23 @@
 'use strict';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const LS='gruppen-duo-ipad-settings',older='gruppy-v1-cache',sessionKey='gruppen-appsscript-admin';let settings=JSON.parse(localStorage.getItem(LS)||'{}'),groups=[],members=[],reports=[],pending=[],groupEvents=[],reminderReceipts=[],selected='none',filter='all',order='az',groupOpen=false,reportOpen=false,expanded=new Set(),popover=null,popoverPosition={top:0,left:0},popoverCloseTimer=null, connected=false, token=localStorage.getItem(sessionKey)||sessionStorage.getItem(sessionKey)||'', localPreview=false,showValues=false;
+// Dismissed phone change notifications are stored locally so polling cannot reopen them.
+const dismissedEventsKey='gruppen-ipad-dismissed-events-v32';
+let dismissedEvents=new Set();
+try{dismissedEvents=new Set(JSON.parse(localStorage.getItem(dismissedEventsKey)||'[]'))}catch{}
+function eventKey(e){
+ if(e.id!==undefined && e.id!==null && String(e.id))return 'id:'+String(e.id);
+ // Deterministic fallback for older server events without an id.
+ const raw=JSON.stringify([e.kind,e.memberId,e.memberName,e.groupId,e.by,e.at,e.createdAt,e.timestamp,e.changes]);
+ let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}
+ return 'hash:'+(h>>>0).toString(16);
+}
+function dismissEvents(keys){keys.forEach(k=>dismissedEvents.add(k));
+ // Prevent unlimited storage growth from older notifications.
+ if(dismissedEvents.size>1000)dismissedEvents=new Set([...dismissedEvents].slice(-800));
+ try{localStorage.setItem(dismissedEventsKey,JSON.stringify([...dismissedEvents]))}catch{}
+ render();
+}
 const prevMonth=()=>{let d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
 $('reportMonth').value=prevMonth();
 const date=s=>{if(!s)return'—';const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:s};
@@ -125,9 +142,9 @@ function render(){const visible=members.filter(m=>!m.hidden);$('groupNav').inner
  $('studiesAll').textContent=Object.values(summary).reduce((a,x)=>a+x.s,0);
  // Reminders and phone contact changes are shown without clearing pending registrations.
  const labels={firstName:'Имя',lastName:'Фамилия',address:'Адрес',phone:'Телефон 1',phone2:'Телефон 2',trustedFirstName:'Доверенное лицо: имя',trustedLastName:'Доверенное лицо: фамилия',trustedPhone:'Телефон доверенного лица'};
- const changes=groupEvents.filter(x=>x.kind==='updated'||x.kind==='added').slice(0,12);
+ const changes=groupEvents.filter(x=>(x.kind==='updated'||x.kind==='added')&&!dismissedEvents.has(eventKey(x))).slice(0,12);
  const box=$('groupEvents');box.hidden=!changes.length;
- box.innerHTML=changes.length?'<h3>Изменения участников с iPhone</h3>'+changes.map(x=>`<div class="group-change"><b>${esc(x.memberName||'')} · ${esc(groupName(x.groupId))}</b> · ${esc(x.by||'')}${x.kind==='added'?'<p>Добавлен новый участник</p>':(x.changes||[]).map(c=>`<p>${esc(labels[c.field]||c.field)}: ${esc(c.before||'—')} → <strong>${esc(c.after||'—')}</strong></p>`).join('')}</div>`).join(''):'';
+ box.innerHTML=changes.length?`<div class="group-events-header"><h3>Изменения участников с iPhone</h3><button type="button" class="events-dismiss-all" data-dismiss-all>Закрыть все</button></div>`+changes.map(x=>`<div class="group-change"><button type="button" class="event-dismiss" data-dismiss-event="${esc(eventKey(x))}" aria-label="Закрыть сообщение" title="Закрыть сообщение">×</button><b>${esc(x.memberName||'')} · ${esc(groupName(x.groupId))}</b> · ${esc(x.by||'')}${x.kind==='added'?'<p>Добавлен новый участник</p>':(x.changes||[]).map(c=>`<p>${esc(labels[c.field]||c.field)}: ${esc(c.before||'—')} → <strong>${esc(c.after||'—')}</strong></p>`).join('')}</div>`).join(''):'';
  $('pending').hidden=!pending.length;$('pending').innerHTML=pending.length?'<b>Ожидают подтверждения на iPhone</b>'+pending.map(p=>`<div class="pending-item"><span>${esc(p.memberName)} · ${esc(groupName(p.groupId))} · ${esc(roleTitle(p.role))}</span><button data-approve="${esc(p.id)}">Подтвердить</button><button data-reject="${esc(p.id)}">Отклонить</button></div>`).join(''):'';
 }
 function openReminderReceipts(){
@@ -272,6 +289,11 @@ document.addEventListener('pointerdown',e=>{
 });
 $('list').addEventListener('scroll',()=>{if(popover)closePopover()},{passive:true});
 window.addEventListener('resize',()=>{if(popover)closePopover()});
+$('groupEvents').addEventListener('click',e=>{
+ const one=e.target.closest('[data-dismiss-event]');
+ if(one){dismissEvents([one.dataset.dismissEvent]);return}
+ if(e.target.closest('[data-dismiss-all]'))dismissEvents(groupEvents.filter(x=>x.kind==='updated'||x.kind==='added').map(eventKey));
+});
 $('pending').onclick=async e=>{const btn=e.target.closest('[data-approve],[data-reject]');if(!btn||btn.disabled)return;
  const id=btn.dataset.approve||btn.dataset.reject,approve=!!btn.dataset.approve,original=pending.slice();
  const row=btn.closest('.pending-item');if(row){row.querySelectorAll('button').forEach(b=>b.disabled=true);row.style.opacity='.5'}
