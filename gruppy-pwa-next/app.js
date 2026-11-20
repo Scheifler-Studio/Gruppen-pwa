@@ -330,7 +330,7 @@ function applyPwaUpdate(){
  if(updateReloadPending || pageBusyForUpdate())return;
  updateReloadPending=true;
  // Avoid a loop if iOS temporarily serves the old app shell from its cache.
- const k='gruppen-ipad-v35-last-reload';
+ const k='gruppen-ipad-v36-last-reload';
  const last=Number(sessionStorage.getItem(k)||0);
  if(Date.now()-last<15000){updateReloadPending=false;return;}
  sessionStorage.setItem(k,String(Date.now()));

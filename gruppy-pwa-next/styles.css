@@ -326,3 +326,12 @@
 .member-sync.failed::after{content:'!'}
 .members.values-visible .member-sync{position:absolute;right:52px;margin:0;top:calc(26px - 9px);z-index:2}
 .member-sync:not(.pending):not(.done):not(.failed){display:none}
+
+/* v36: Unified modal stacking: overlays are always above the app, including
+   its sticky header, dropdowns, group filters and colored participant rows. */
+.app{position:relative;isolation:isolate;z-index:0}
+#backdrop{z-index:10000}
+#connectOverlay{z-index:11000}
+#saveFailure{z-index:10500}
+#toast{z-index:12000}
+#backdrop[hidden],#connectOverlay[hidden],#saveFailure[hidden],#toast[hidden]{display:none!important}
