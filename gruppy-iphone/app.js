@@ -1,7 +1,7 @@
 "use strict";
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 const KEY='gruppen-duo-iphone';let settings=JSON.parse(localStorage.getItem(KEY)||'{}'),members=[],reports=[],order=[],group='',person='',myRole='';
-let reorderMode=false,requesting=false,refreshing=false,pendingTimer=null,reminderTimer=null;const OUTBOX_KEY='gruppen-iphone-report-outbox-v20';let outbox=[];try{outbox=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');if(!Array.isArray(outbox))outbox=[]}catch{outbox=[]}let sendingOutbox=false;const SNAPSHOT_KEY='gruppen-iphone-bootstrap-cache-v31';let lastSendErrorAt=0;
+let reorderMode=false,requesting=false,refreshing=false,pendingTimer=null,reminderTimer=null;const OUTBOX_KEY='gruppen-iphone-report-outbox-v20';let outbox=[];try{outbox=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');if(!Array.isArray(outbox))outbox=[]}catch{outbox=[]}let sendingOutbox=false;const REPORT_ERRORS_KEY='gruppen-iphone-report-errors-v34';let reportErrors={};try{reportErrors=JSON.parse(localStorage.getItem(REPORT_ERRORS_KEY)||'{}')||{}}catch{reportErrors={}};const SNAPSHOT_KEY='gruppen-iphone-bootstrap-cache-v31';let lastSendErrorAt=0;
 // Contact edits are optimistic and stored separately from the existing report outbox.
 // Multiple members may be edited while an earlier change is awaiting a server response.
 const CONTACT_OUTBOX_KEY='gruppen-iphone-contacts-outbox-v33';
@@ -77,7 +77,7 @@ function connectBridge(){if(!bridgeInitialized){GoogleBridge.connect(APP_SCRIPT_
 function phoneCall(action,payload={}){connectBridge();return GoogleBridge.call(action,payload,settings.token||'')}
 const maxMonth=()=>prevMonth();
 const monthText=m=>{const a=/^(\d{4})-(\d{2})$/.exec(m||'');return a?`${a[1]} · ${months[Number(a[2])-1]}`:'—'};
-function statusFor(m){const queued=outbox.find(x=>x.data.memberId===m.id&&x.data.month===$('month').value);if(queued)return {cls:'done',glyph:'✓',label:queued.failed?'Сохранено на телефоне, ожидает повторной отправки':'Сохранено на телефоне, отправляется на сервер'};const report=reports.find(x=>x.memberId===m.id);if(report)return {cls:'done',glyph:'✓',label:'Отчёт сохранён'};const now=new Date();const day=now.getDate();const isLatest=$('month').value===prevMonth();if(isLatest&&day>15)return {cls:'late',glyph:'−',label:'Отчёт просрочен'};if(isLatest&&day>10)return {cls:'warn',glyph:'−',label:'Отчёт ожидается'};return {cls:'empty',glyph:'',label:'Нет отчёта'}}
+function statusFor(m){const queued=outbox.find(x=>x.data.memberId===m.id&&x.data.month===$('month').value);if(queued)return {cls:'pending',glyph:'',label:reportErrors[reportKey(queued.data)]?'Ошибка отправки отчёта: '+reportErrors[reportKey(queued.data)]:'Отчёт на телефоне, ожидает подтверждения сервера'};const report=reports.find(x=>x.memberId===m.id);if(report)return {cls:'done',glyph:'✓',label:'Отчёт сохранён'};const now=new Date();const day=now.getDate();const isLatest=$('month').value===prevMonth();if(isLatest&&day>15)return {cls:'late',glyph:'−',label:'Отчёт просрочен'};if(isLatest&&day>10)return {cls:'warn',glyph:'−',label:'Отчёт ожидается'};return {cls:'empty',glyph:'',label:'Нет отчёта'}}
 function updateCalendarIcon(){const now=new Date(),abbr=['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];$('todayMonth').textContent=abbr[now.getMonth()];$('todayDay').textContent=String(now.getDate())}
 function updatePeriod(){const m=$('month').value;$('periodLabel').innerHTML='<span class="period-year">'+esc(m.slice(0,4))+'</span><span class="period-month">'+esc(months[Number(m.slice(5))-1]||'')+'</span>';updateCalendarIcon();renderMonthChoices()}
 function renderMonthChoices(){const active=prevMonth(),lastYear=Math.max(2026,Number(active.slice(0,4)));let html='';for(let year=2026;year<=lastYear;year++){html+=`<div class="month-year">${year}</div><div class="month-grid">`;for(let i=0;i<12;i++){const key=`${year}-${String(i+1).padStart(2,'0')}`,available=key===active;html+=`<button type="button" data-period="${key}" ${available?'':'disabled'} class="${available?'current':''}" aria-label="${months[i]} ${year}${available?'':' — недоступно'}">${months[i]}</button>`}html+='</div>'} $('monthChoices').innerHTML=html}
@@ -97,9 +97,9 @@ function render(){
  const day=new Date().getDate();
  $('members').innerHTML=all.map((m,i)=>{
   const state=stateById.get(m.id),role=m.role==='leader'?'leader':m.role==='assistant'?'assistant':'';
-  const rowTone=state.cls==='done'?'reported':day<=10?'waiting':'overdue';
+  const rowTone=(state.cls==='done'||state.cls==='pending')?'reported':day<=10?'waiting':'overdue';
   const suffix='';
-  return `<div class="member-row ${rowTone}" data-member="${esc(m.id)}" title="${esc(state.label+suffix)}"><div class="member-details"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span></span>${showContactStatus(m.id)}<button type="button" class="member-action" data-edit="${esc(m.id)}" aria-label="Внести отчёт: ${esc(m.lastName)} ${esc(m.firstName)}"><span aria-hidden="true">•••</span></button></div>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`;
+  return `<div class="member-row ${rowTone}" data-member="${esc(m.id)}" title="${esc(state.label+suffix)}"><div class="member-details"><span class="member-names"><span class="member-name ${role}">${esc(m.lastName)} ${esc(m.firstName)}</span></span>${showContactStatus(m.id)}${reportSyncIndicator(m)}<button type="button" class="member-action" data-edit="${esc(m.id)}" aria-label="Внести отчёт: ${esc(m.lastName)} ${esc(m.firstName)}"><span aria-hidden="true">•••</span></button></div>${reorderMode?`<div class="order-buttons"><button data-up="${esc(m.id)}" ${i===0?'disabled':''} aria-label="Выше">↑</button><button data-down="${esc(m.id)}" ${i===all.length-1?'disabled':''} aria-label="Ниже">↓</button></div>`:''}</div>`;
  }).join('')||'<div class="empty">В группе пока нет участников.</div>';
 }
 
@@ -120,35 +120,50 @@ const options=(from,to,value)=>Array.from({length:to-from+1},(_,i)=>`<option val
 function openSheet(title,html){$('formTitle').textContent=title;$('formBody').innerHTML=html;$('overlay').hidden=false}
 function closeSheet(){$('overlay').hidden=true;$('formBody').innerHTML=''}
 function saveOutbox(){localStorage.setItem(OUTBOX_KEY,JSON.stringify(outbox))}
-function nonRetryableReportError(err){
- // Network failures and iframe timeouts never discard the locally stored report.
- return /недействительн|отозван|не найден участник|участник удалён|неверн(?:ый|ое) (?:месяц|отчёт)|недопустим|нет прав|доступ запрещён|validation|invalid (?:month|member|category)/i.test(String(err?.message||''));
+function saveReportErrors(){localStorage.setItem(REPORT_ERRORS_KEY,JSON.stringify(reportErrors))}
+function reportKey(data){return String(data.memberId)+'|'+String(data.month)}
+function reportSyncIndicator(m){
+ const entry=outbox.find(x=>x.data.memberId===m.id&&x.data.month===$('month').value);
+ if(entry){const error=reportErrors[reportKey(entry.data)];return `<span class="report-sync ${error?'is-error':'is-sending'}" role="status" title="${esc(error||'Отчёт ждёт подтверждения сервера')}">${error?'!':'<span class="report-spinner"></span>'}</span>`}
+ const stamp=reportSuccess.get(m.id);
+ if(stamp&&Date.now()-stamp<5000)return '<span class="report-sync is-success" role="status" title="Отчёт подтверждён сервером">✓</span>';
+ return '';
+}
+const reportSuccess=new Map();
+
+function rejectedReportError(err){
+ return /недействительн|отозван|не найден участник|участник удалён|неверн|недопустим|нет прав|доступ запрещ|выбери|регистрация|изучения|часы|validation|invalid|неизвестная операция/i.test(String(err?.message||''));
 }
 async function flushOutbox(){
  if(sendingOutbox||!settings.token||!outbox.length||!navigator.onLine)return;
  sendingOutbox=true;
  try{
   for(const entry of [...outbox]){
-   // Skip entries replaced by a newer local edit.
    if(!outbox.some(x=>x.id===entry.id))continue;
+   const key=reportKey(entry.data);
+   // A server validation error is not a network issue. Keep data until corrected.
+   if(reportErrors[key])continue;
    try{
-    await phoneCall('phoneReport',entry.data);
+    const result=await phoneCall('phoneReport',entry.data);
+    if(!result||result.ok!==true)throw Error('Сервер не подтвердил сохранение отчёта');
     outbox=outbox.filter(x=>x.id!==entry.id);
-    saveOutbox();lastSendErrorAt=0;
+    saveOutbox();delete reportErrors[key];saveReportErrors();lastSendErrorAt=0;
     if(entry.data.month===$('month').value&&!outbox.some(x=>x.data.memberId===entry.data.memberId&&x.data.month===entry.data.month)){
      reports=reports.filter(r=>r.memberId!==entry.data.memberId);
      reports.push({...entry.data,updatedAt:new Date().toISOString()});
      try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({token:settings.token,members,reports,order,group,person,myRole,month:$('month').value}))}catch{}
     }
-    render();
+    reportSuccess.set(entry.data.memberId,Date.now());render();
+    setTimeout(()=>{if(Date.now()-(reportSuccess.get(entry.data.memberId)||0)>=4900){reportSuccess.delete(entry.data.memberId);render()}},5100);
    }catch(err){
-    if(nonRetryableReportError(err)){
-     outbox=outbox.filter(x=>x.id!==entry.id);saveOutbox();
-     render();notice('Отчёт не принят сервером: '+err.message+'. Изменение отменено.');
+    const msg=String(err?.message||'Неизвестная ошибка');
+    if(rejectedReportError(err)){
+     reportErrors[key]=msg;saveReportErrors();entry.failed=true;saveOutbox();render();
+     notice('Отчёт не принят сервером: '+msg+'. Откройте отчёт участника и исправьте данные.');
      continue;
     }
     entry.failed=true;saveOutbox();lastSendErrorAt=Date.now();render();
-    notice('Нет подтверждения сервера. Отчёт сохранён на телефоне и будет отправлен при подключении.');
+    notice('Не удалось отправить отчёт: '+msg+'. Отчёт остался на телефоне, повторим отправку позже.');
     break;
    }
   }
@@ -170,7 +185,7 @@ function editReport(m){if($('month').value!==prevMonth()){$('month').value=prevM
  const answerSelect=form.elements.answer;
  function updateAnswerPlaceholder(){answerSelect.classList.toggle('answer-placeholder',!answerSelect.value)}
  answerSelect.addEventListener('change',updateAnswerPlaceholder);updateAnswerPlaceholder();
- form.onsubmit=e=>{e.preventDefault();const f=e.currentTarget,submit=f.querySelector('button[type=submit]');if(submit.disabled)return;submit.disabled=true;const data={memberId:m.id,month:$('month').value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};outbox=outbox.filter(x=>!(x.data.memberId===data.memberId&&x.data.month===data.month));outbox.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2),data,failed:false});saveOutbox();closeSheet();render();notice(navigator.onLine?'Сохранено на телефоне. Отправляем в Google Drive…':'Сохранено на телефоне. Отправим при появлении интернета.');if(navigator.onLine)flushOutbox()}}
+ form.onsubmit=e=>{e.preventDefault();const f=e.currentTarget,submit=f.querySelector('button[type=submit]');if(submit.disabled)return;submit.disabled=true;const data={memberId:m.id,month:$('month').value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};if(['V','UV'].includes(data.category)&&!['yes','no'].includes(data.answer)){submit.disabled=false;$('error').textContent='Для V и UV необходимо выбрать «Да» или «Нет»';$('error').hidden=false;return}delete reportErrors[reportKey(data)];saveReportErrors();outbox=outbox.filter(x=>!(x.data.memberId===data.memberId&&x.data.month===data.month));outbox.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2),data,failed:false});saveOutbox();closeSheet();render();notice(navigator.onLine?'Сохранено на телефоне. Отправляем в Google Drive…':'Сохранено на телефоне. Отправим при появлении интернета.');if(navigator.onLine)flushOutbox()}}
 const contactFields=['firstName','lastName','address','phone','phone2','trustedFirstName','trustedLastName','trustedPhone'];
 function memberFormHtml(m){
  const val=k=>esc(m?.[k]||'');
@@ -226,7 +241,30 @@ $('monthChoices').onclick=e=>{const b=e.target.closest('[data-period]');if(!b||b
 $('gear').onclick=()=>{$('groupSettings').hidden=!$('groupSettings').hidden;$('monthPanel').hidden=true};
 $('addMember').onclick=addMember;
 $('editContacts').onclick=()=>chooseMember('edit');$('viewContacts').onclick=()=>chooseMember('view');$('reorderToggle').onclick=()=>{reorderMode=!reorderMode;$('reorderToggle').textContent=reorderMode?'Завершить изменение порядка':'Изменить порядок участников';$('groupSettings').hidden=true;render()};
-$('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе',`<div class="about-app"><strong>Группы</strong><p>Версия для iPhone: ${esc(APP_VERSION)}</p><p>Отчёты участников и управление группой</p></div>`)};
+$('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе',`<div class="about-app"><strong>Группы</strong><p>Установленная версия: <b>${esc(APP_VERSION)}</b></p><p id="updateStatus">Проверка обновлений ещё не выполнялась</p><button class="secondary-action" id="checkUpdate" type="button">Проверить обновление</button><button class="primary" id="installUpdate" type="button" hidden>Обновить программу</button></div>`);$('checkUpdate').onclick=()=>checkAppUpdate(true);$('installUpdate').onclick=installAppUpdate;checkAppUpdate(false)};
+let newAvailableVersion='';
+async function checkAppUpdate(interactive=false){
+ const status=$('updateStatus'),button=$('installUpdate');
+ if(status)status.textContent='Проверяем новую версию…';
+ try{
+  const url=new URL('version.json',location.href);url.searchParams.set('t',String(Date.now()));
+  const res=await fetch(url.href,{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);
+  const manifest=await res.json();const next=String(manifest.version||'');if(!/^\d+(?:\.\d+)*$/.test(next))throw Error('Некорректный номер версии');
+  newAvailableVersion=next.split('.').map(Number).reduce((v,n)=>v*1000+n,0)>APP_VERSION.split('.').map(Number).reduce((v,n)=>v*1000+n,0)?next:'';
+  if(status)status.textContent=newAvailableVersion?'Доступна новая версия: '+newAvailableVersion:'Установлена актуальная версия '+APP_VERSION;
+  if(button)button.hidden=!newAvailableVersion;
+ }catch(err){if(status)status.textContent='Не удалось проверить обновления: '+err.message;else if(interactive)notice('Не удалось проверить обновление: '+err.message)}
+}
+async function installAppUpdate(){
+ const status=$('updateStatus');if(status)status.textContent='Загружаем обновление…';
+ try{
+  if('serviceWorker'in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();await navigator.serviceWorker.ready}}
+  // Delete only this application's asset cache. Never clear localStorage, tokens or report queues.
+  if('caches'in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith('gruppen-iphone-')).map(k=>caches.delete(k)))}
+  location.reload();
+ }catch(e){if(status)status.textContent='Не получилось применить обновление: '+e.message}
+}
+
 $('groupInfo').onclick=()=>{$('groupSettings').hidden=true;openSheet('Информация о группе',`<div class="about-app"><p><strong>Группа ${esc(group||'—')}</strong></p><p>Количество участников: <strong>${members.length}</strong></p></div>`)};
 $('notifyToggle').onclick=()=>{if(!('Notification'in window)){notice('Уведомления не поддерживаются в этом браузере');return}Notification.requestPermission().then(p=>notice(p==='granted'?'Уведомления разрешены':'Уведомления не разрешены'))};
 let touchStart=null;
@@ -235,8 +273,8 @@ $('members').addEventListener('touchend',e=>{if(!touchStart||!e.changedTouches.l
 $('members').onclick=async e=>{const retry=e.target.closest('[data-retry-contact]');if(retry){const id=retry.dataset.retryContact;contactErrors.delete(id);render();notice('Откройте участника и повторите сохранение');return}const edit=e.target.closest('[data-edit]'),up=e.target.closest('[data-up]'),down=e.target.closest('[data-down]');if(edit&&!reorderMode){const m=members.find(x=>x.id===edit.dataset.edit);if(m)editReport(m);return}if(up||down){const id=up?.dataset.up||down.dataset.down;const sorted=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);return (ai<0?9999:ai)-(bi<0?9999:bi)});const index=sorted.findIndex(m=>m.id===id),next=index+(up?-1:1);if(next<0||next>=sorted.length)return;[sorted[index],sorted[next]]=[sorted[next],sorted[index]];const ids=sorted.map(m=>m.id);try{await phoneCall('phoneReorder',{ids});order=ids;render()}catch(ex){notice(ex.message)}}};
 $('close').onclick=closeSheet;$('overlay').onclick=e=>{if(e.target===$('overlay'))closeSheet()};
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-connectBridge();if(settings.token){loadOfflineSnapshot();if(navigator.onLine){flushContactOutbox();refresh()}else notice('Работа без интернета: новые отчёты сохраняются на телефоне.')}else show('login');
+connectBridge();checkAppUpdate(false);if(settings.token){loadOfflineSnapshot();if(navigator.onLine){flushContactOutbox();refresh()}else notice('Работа без интернета: новые отчёты сохраняются на телефоне.')}else show('login');
 window.addEventListener('online',()=>{notice('Интернет восстановлен. Отправляем сохранённые отчёты…');Promise.all([flushOutbox(),flushContactOutbox()]).then(()=>{flushReminderAcks();refresh()})});
 setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden&&navigator.onLine){if(contactOutbox.length&&(!contactSendFailedAt||Date.now()-contactSendFailedAt>60000))flushContactOutbox();if(outbox.length){if(!lastSendErrorAt||Date.now()-lastSendErrorAt>60000)flushOutbox()}else if(!contactOutbox.length)refresh()}},30000);
 setInterval(()=>{if(settings.token&&!document.hidden&&!$('active').hidden){showMonthlyReminder();decemberReminder();flushReminderAcks()}},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){decemberReminder();flushReminderAcks()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){decemberReminder();flushReminderAcks();checkAppUpdate(false)}});

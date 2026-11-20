@@ -255,3 +255,10 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 #members .contact-sync.is-success{background:#2b9553;color:#fff}
 #members .contact-sync.is-error{background:#fce3e3;color:#af2731;cursor:pointer}
 @media(prefers-reduced-motion:reduce){#members .contact-spinner{animation-duration:1.8s}}
+/* v34: per-member report delivery feedback, separate from contact updates. */
+.report-sync{width:22px;height:22px;min-width:22px;display:inline-grid;place-items:center;vertical-align:middle;flex:none;border-radius:50%;font-size:15px;font-weight:700}
+.report-sync.is-sending{color:#6b7280}
+.report-spinner{display:block;width:15px;height:15px;border:2px solid #d4d9e1;border-top-color:#64748b;border-radius:50%;animation:report-rotate .8s linear infinite}
+.report-sync.is-error{color:#a21d2b;background:#fff0f2;border:1px solid #e9b9c0}
+.report-sync.is-success{background:#16a34a;color:white}
+@keyframes report-rotate{to{transform:rotate(360deg)}}
