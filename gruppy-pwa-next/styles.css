@@ -335,3 +335,10 @@
 #saveFailure{z-index:10500}
 #toast{z-index:12000}
 #backdrop[hidden],#connectOverlay[hidden],#saveFailure[hidden],#toast[hidden]{display:none!important}
+
+/* iPad v37: update information stays within the settings dialog. */
+.app-update-section{padding:2px 0 7px}
+.app-update-section .installed-version{margin:8px 0 7px;font-size:18px}
+.app-update-section #appUpdateStatus{font-size:15px;min-height:22px}
+.app-update-section .app-update-actions{justify-content:flex-start;flex-wrap:wrap;margin:10px 0}
+.app-update-section #installAppUpdate[hidden]{display:none!important}

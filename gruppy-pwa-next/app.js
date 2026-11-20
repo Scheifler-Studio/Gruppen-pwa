@@ -180,6 +180,11 @@ function showSettings(){
  <label class="field">Пароль<input name="password" type="password" autocomplete="off" placeholder="Пароль из ADMIN_PASSWORD"></label>
  <div id="googleStatus" class="connection-status ${isConnected()?'connected':''}">${isConnected()?'База готова к сохранению':'Не подключено'}</div>
  <div class="actions"><button class="secondary" type="button" id="testGoogle">Проверить подключение</button><button class="primary" type="submit" id="connectGoogle">Подключить Google Drive</button></div></form>
+ <hr><section class="app-update-section" aria-label="Обновление программы"><h3>Обновление программы</h3>
+ <p class="installed-version">Установленная версия: <strong id="installedAppVersion">37.0</strong></p>
+ <p class="hint" id="appUpdateStatus" role="status" aria-live="polite">Проверяем наличие новой версии…</p>
+ <div class="actions app-update-actions"><button class="secondary" type="button" id="checkAppUpdate">Проверить обновление</button><button class="primary" type="button" id="installAppUpdate" hidden>Обновить программу</button></div>
+ <p class="hint">При обновлении программа загрузит новые файлы с GitHub. Пароль, регистрация и настройки подключения сохранятся.</p></section>
  <hr><h3>Цвета групп</h3>
  <p class="hint">Выбери фоновый цвет для каждой группы. Он будет одинаковым в общем списке и при просмотре группы отдельно. Выбор сохраняется на этом iPad.</p>
  <div class="group-color-settings">${groups.length?groups.map(g=>`<div class="group-color-row"><span>Группа <strong>${esc(g.name)}</strong></span><select class="group-color-select" data-color-group="${esc(g.id)}" aria-label="Цвет группы ${esc(g.name)}">${GROUP_COLORS.map(c=>`<option value="${c.id}" ${((settings.groupColors?.[String(g.id)]||DEFAULT_COLORS[Math.max(0,groups.findIndex(x=>x.id===g.id))%DEFAULT_COLORS.length])===c.id)?'selected':''}>${c.name}</option>`).join('')}</select><span class="group-color-preview" data-color-preview="${esc(g.id)}" style="background:${groupColor(g.id)}"></span></div>`).join(''):'<p class="hint">Сначала создай группу, чтобы выбрать её цвет.</p>'}</div>
@@ -192,6 +197,46 @@ function showSettings(){
   if(preview)preview.style.background=groupColor(select.dataset.colorGroup);
   render();
  }});
+ // Manual update control deliberately does not touch Google Drive settings or login.
+ let newestVersion=APP_VERSION;
+ const updateStatus=$('appUpdateStatus'),updateButton=$('installAppUpdate'),checkButton=$('checkAppUpdate');
+ async function readAvailableVersion(){
+  checkButton.disabled=true;
+  updateStatus.textContent='Проверяем обновление на GitHub…';
+  updateButton.hidden=true;
+  try{
+   const res=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});
+   if(!res.ok)throw new Error('Сервер версий недоступен ('+res.status+')');
+   const remote=await res.json();
+   newestVersion=Number(remote.version);
+   if(!Number.isFinite(newestVersion))throw new Error('Неверный номер версии');
+   if(newestVersion>APP_VERSION){
+    updateStatus.textContent='Доступна новая версия '+(remote.displayVersion||newestVersion+'.0')+'.';
+    updateButton.hidden=false;
+   }else if(newestVersion===APP_VERSION){updateStatus.textContent='Установлена актуальная версия '+APP_VERSION+'.0.';}
+   else{updateStatus.textContent='Установленная версия новее опубликованной. Дождитесь публикации файлов на GitHub.';}
+  }catch(err){updateStatus.textContent='Не удалось проверить обновление: '+err.message;}
+  finally{checkButton.disabled=false;}
+ }
+ checkButton.onclick=readAvailableVersion;
+ updateButton.onclick=async()=>{
+  if(newestVersion<=APP_VERSION)return;
+  updateButton.disabled=true;checkButton.disabled=true;
+  updateStatus.textContent='Загружаем обновление '+newestVersion+'.0…';
+  try{
+   if('serviceWorker' in navigator){
+    const reg=swRegistration||await navigator.serviceWorker.getRegistration();
+    if(reg)await reg.update();
+   }
+   // Dismiss the settings modal before navigation; do not erase local storage.
+   closeModal();
+   const url=new URL('./',location.href);
+   url.searchParams.set('v',String(newestVersion));
+   url.searchParams.set('updated',String(Date.now()));
+   location.replace(url.href);
+  }catch(err){updateStatus.textContent='Не удалось загрузить обновление: '+err.message;updateButton.disabled=false;checkButton.disabled=false;}
+ };
+ readAvailableVersion();
  const form=$('settingsForm');
  function updateConnectionButtons(){const active=isConnected()&&GoogleBridge.normalizeUrl(form.elements.scriptUrl.value)===settings.scriptUrl&&!form.elements.password.value.trim();$('testGoogle').disabled=active;$('connectGoogle').disabled=active;}
  form.elements.scriptUrl.addEventListener('input',updateConnectionButtons);
@@ -323,14 +368,14 @@ $('pending').onclick=async e=>{const btn=e.target.closest('[data-approve],[data-
  catch(ex){pending=original;render();showToast('Не удалось сохранить решение: '+ex.message)}
 };document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 // PWA update management. Data/session keys remain untouched.
-const APP_VERSION=35;
+const APP_VERSION=37;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
  if(updateReloadPending || pageBusyForUpdate())return;
  updateReloadPending=true;
  // Avoid a loop if iOS temporarily serves the old app shell from its cache.
- const k='gruppen-ipad-v36-last-reload';
+ const k='gruppen-ipad-v37-last-reload';
  const last=Number(sessionStorage.getItem(k)||0);
  if(Date.now()-last<15000){updateReloadPending=false;return;}
  sessionStorage.setItem(k,String(Date.now()));
@@ -356,7 +401,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=35',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=37',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();
