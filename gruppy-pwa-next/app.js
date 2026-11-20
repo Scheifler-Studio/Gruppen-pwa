@@ -139,8 +139,20 @@ function render(){const visible=members.filter(m=>!m.hidden);$('groupNav').inner
 
  const summary={APV:{n:0,h:0,s:0},HPV:{n:0,h:0,s:0},V:{n:0,h:0,s:0},UV:{n:0,h:0,s:0}};
  const visibleIds=new Set(visible.filter(m=>selected!=='none'&&(selected==='all'||selected===m.groupId)&&passesGroupFilter(m)).map(m=>String(m.id)));
- // Count only reports for currently displayed people; no report = no entry.
- for(const r of reports){if(!visibleIds.has(String(r.memberId)))continue;const k=reportCategory(r.category);if(!summary[k])continue;const hours=Number(r.hours)||0,studies=Number(r.studies)||0;const valid=['APV','HPV'].includes(k)?hours>0:r.answer==='yes';if(!valid)continue;summary[k].n++;summary[k].h+=['APV','HPV'].includes(k)?hours:0;summary[k].s+=Math.max(0,studies)}
+ // Membership counts are based on the service type assigned in the member card,
+ // independently of whether a monthly report has been submitted.
+ // The currently selected group(s) determine which members are included.
+ for(const m of visible){
+  if(!visibleIds.has(String(m.id)))continue;
+  const k=reportCategory(m.category);
+  if(!summary[k])continue;
+  summary[k].n++;
+  const r=reportMap.get(String(m.id));
+  if(!r)continue;
+  // Hours and studies are collected only from reports for the selected month.
+  if(k==='APV'||k==='HPV')summary[k].h+=Math.max(0,Number(r.hours)||0);
+  summary[k].s+=Math.max(0,Number(r.studies)||0);
+ }
  for(const k of ['APV','HPV','V','UV']){$('sum'+k).textContent=summary[k].n;$('hours'+k).textContent=summary[k].h;$('studies'+k).textContent=summary[k].s}
  $('sumAll').textContent=Object.values(summary).reduce((a,x)=>a+x.n,0);
  $('hoursAll').textContent=Object.values(summary).reduce((a,x)=>a+x.h,0);
