@@ -305,3 +305,24 @@
 .group-change{position:relative;padding-right:48px}
 .event-dismiss{position:absolute;top:5px;right:6px;display:grid;place-items:center;width:34px;height:34px;border:0;background:transparent;color:#483c20;font-size:26px;font-weight:400;line-height:1;border-radius:50%}
 .event-dismiss:hover,.event-dismiss:focus-visible{background:#f2dfab}
+
+/* v33: top add-menu must overlay sorting toolbar and participant list */
+.topbar{z-index:60;isolation:isolate;overflow:visible}
+.add-wrap{z-index:70}
+#addMenu{z-index:1000;box-shadow:0 16px 38px #1b284b45}
+.toolbar{z-index:4}
+/* Compact role / code row in participant editor */
+#memberForm .member-role-row{display:grid;grid-template-columns:minmax(85px,0.65fr) minmax(220px,2.15fr) minmax(100px,.8fr);gap:10px;align-items:start}
+#memberForm .member-role-row .field{min-width:0}
+#memberForm .member-role-row .code-small input{letter-spacing:2px;text-align:center}
+@media(max-width:600px){#memberForm .member-role-row{grid-template-columns:minmax(64px,.7fr) minmax(140px,2fr) minmax(75px,.8fr);gap:6px}#memberForm .member-role-row .field{font-size:12px}#memberForm .member-role-row input,#memberForm .member-role-row select{font-size:13px;padding:7px 3px}}
+
+/* v33: per-person asynchronous send indicator */
+.member-sync{display:none;flex:0 0 18px;width:18px;height:18px;margin-left:auto;align-self:center}
+.member-sync.pending{display:block;border:2px solid #c3d1e0;border-top-color:#256cc2;border-radius:50%;animation:iconRotate .8s linear infinite}
+.member-sync.done{display:grid;place-items:center;border-radius:50%;background:#27a65b;color:#fff;font-size:13px;font-weight:800}
+.member-sync.done::after{content:'✓'}
+.member-sync.failed{display:grid;place-items:center;border-radius:50%;background:#cb3b3e;color:#fff;font-size:13px;font-weight:800}
+.member-sync.failed::after{content:'!'}
+.members.values-visible .member-sync{position:absolute;right:52px;margin:0;top:calc(26px - 9px);z-index:2}
+.member-sync:not(.pending):not(.done):not(.failed){display:none}
