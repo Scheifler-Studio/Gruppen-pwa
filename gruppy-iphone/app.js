@@ -46,7 +46,7 @@ async function refresh(){if(!settings.token){show('login');return}if(refreshing)
  if(d.status==='pending'){show('pending');$('pendingText').textContent='Ваш код отправлен. В ближайшее время заявка будет рассмотрена.';return}
  if(d.status==='rejected'){settings.token='';save();show('login');notice('Регистрация отклонена. Обратитесь к секретарю.');return}
  if(d.status!=='approved')throw Error('Нет подтверждения регистрации');
- members=Array.isArray(d.members)?d.members:[];reports=Array.isArray(d.reports)?d.reports:[];order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.role||'';try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({token:settings.token,members,reports,order,group,person,myRole,month:$('month').value}))}catch(e){console.warn('Кэш недоступен',e)}show('active');render();showMonthlyReminder();flushOutbox();
+ members=Array.isArray(d.members)?d.members:[];reports=Array.isArray(d.reports)?d.reports:[];order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.role||'';try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({token:settings.token,members,reports,order,group,person,myRole,month:$('month').value}))}catch(e){console.warn('Кэш недоступен',e)}show('active');render();showMonthlyReminder();flushOutbox();flushReminderAcks();decemberReminder();
  }catch(e){if(/недействител|отозван|не найден|отклонен|отклонён|Регистрация удалена/i.test(e.message)){settings.token='';save();show('login');notice(e.message)}else {if(members.length||!$('active').hidden){show('active');render();notice('Нет интернета. Данные доступны, отчёты будут отправлены при подключении.')}else notice('Нет связи с Google Drive: '+e.message)}}finally{refreshing=false}}
 function showMonthlyReminder(){const now=new Date(),monthKey=`${now.getFullYear()}-${now.getMonth()+1}`;if(now.getDate()!==1||now.getHours()<10)return;
  if(localStorage.getItem('gruppen-month-reminder')===monthKey)return;
@@ -99,7 +99,7 @@ function loadOfflineSnapshot(){
   if(!d||d.token!==settings.token||!Array.isArray(d.members))return false;
   members=d.members;reports=Array.isArray(d.reports)?d.reports:[];
   order=Array.isArray(d.order)?d.order:[];group=d.group||'';person=d.person||'';myRole=d.myRole||'';
-  show('active');render();return true;
+  show('active');render();decemberReminder();return true;
  }catch{return false}
 }
 
@@ -109,8 +109,39 @@ function editReport(m){if($('month').value!==prevMonth()){$('month').value=prevM
  function updateAnswerPlaceholder(){answerSelect.classList.toggle('answer-placeholder',!answerSelect.value)}
  answerSelect.addEventListener('change',updateAnswerPlaceholder);updateAnswerPlaceholder();
  form.onsubmit=e=>{e.preventDefault();const f=e.currentTarget,submit=f.querySelector('button[type=submit]');if(submit.disabled)return;submit.disabled=true;const data={memberId:m.id,month:$('month').value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};outbox=outbox.filter(x=>!(x.data.memberId===data.memberId&&x.data.month===data.month));outbox.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2),data,failed:false});saveOutbox();closeSheet();render();notice(navigator.onLine?'Сохранено на телефоне. Отправляем в Google Drive…':'Сохранено на телефоне. Отправим при появлении интернета.');if(navigator.onLine)flushOutbox()}}
-function addMember(){openSheet('Новый участник',`<form id="newMemberForm"><label>Имя<input required name="firstName" maxlength="120"></label><label>Фамилия<input required name="lastName" maxlength="120"></label><label>Адрес<textarea name="address" rows="2"></textarea></label><label>Телефон<input name="phone" type="tel"></label><label>Вид служения<select name="category"><option value="">Выбрать</option>${serviceTypes.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label><p class="hint">Группа ${esc(group)} назначается автоматически. Должности назначает только секретарь.</p><div id="error" class="error" hidden></div><button class="primary" type="submit">Добавить участника</button></form>`);$('newMemberForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Сохранение…';try{await phoneCall('phoneAddMember',{firstName:f.elements.firstName.value.trim(),lastName:f.elements.lastName.value.trim(),address:f.elements.address.value.trim(),phone:f.elements.phone.value.trim(),category:f.elements.category.value});closeSheet();await refresh();notice('Участник добавлен')}catch(err){btn.disabled=false;btn.textContent='Добавить участника';$('error').hidden=false;$('error').textContent=err.message}}}
+const contactFields=['firstName','lastName','address','phone','phone2','trustedFirstName','trustedLastName','trustedPhone'];
+function memberFormHtml(m){
+ const val=k=>esc(m?.[k]||'');
+ return `<form id="contactForm" class="contact-form"><div class="contact-name-row"><label>Имя<input required name="firstName" maxlength="120" value="${val('firstName')}"></label><label>Фамилия<input required name="lastName" maxlength="120" value="${val('lastName')}"></label></div><label>Адрес<textarea name="address" rows="2">${val('address')}</textarea></label><label>Телефон 1<input name="phone" type="tel" value="${val('phone')}"></label><label>Телефон 2<input name="phone2" type="tel" value="${val('phone2')}"></label><div class="contact-divider">Доверительное лицо</div><div class="contact-name-row"><label>Имя<input name="trustedFirstName" value="${val('trustedFirstName')}"></label><label>Фамилия<input name="trustedLastName" value="${val('trustedLastName')}"></label></div><label>Телефон доверительного лица<input name="trustedPhone" type="tel" value="${val('trustedPhone')}"></label>${!m?`<label>Вид служения<select name="category"><option value="">Выбрать</option>${serviceTypes.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>`:''}<p class="hint">Группа ${esc(group)}. Назначения изменяет секретарь.</p><div id="error" class="error" hidden></div><button class="primary" type="submit">Сохранить</button></form>`;
+}
+function editMemberContact(m=null){$('groupSettings').hidden=true;openSheet(m?'Редактировать участника':'Новый участник',memberFormHtml(m));
+ $('contactForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,btn=f.querySelector('[type=submit]');const data={};for(const k of contactFields)data[k]=f.elements[k].value.trim();if(!m)data.category=f.elements.category.value;else data.memberId=m.id;
+ btn.disabled=true;btn.textContent='Отправляется…';try{await phoneCall(m?'phoneUpdateMember':'phoneAddMember',data);closeSheet();await refresh();notice(m?'Изменения отправлены секретарю':'Участник добавлен. Секретарь получит уведомление')}catch(err){btn.disabled=false;btn.textContent='Сохранить';$('error').hidden=false;$('error').textContent=err.message}}
+}
+function addMember(){editMemberContact()}
+function viewMember(m){const fields=[['Имя',m.firstName],['Фамилия',m.lastName],['Адрес',m.address],['Телефон 1',m.phone],['Телефон 2',m.phone2],['Доверительное лицо', [m.trustedFirstName,m.trustedLastName].filter(Boolean).join(' ')],['Телефон доверительного лица',m.trustedPhone],['Вид служения',m.category]];
+ openSheet('Информация об участнике',`<div class="contact-view">${fields.map(([label,value])=>`<div><span>${esc(label)}</span><strong>${esc(value||'—')}</strong></div>`).join('')}</div><div class="contact-actions"><button type="button" id="contactClose">Закрыть</button><button type="button" id="contactEdit" class="primary">Изменить</button></div>`);
+ $('contactClose').onclick=closeSheet;$('contactEdit').onclick=()=>editMemberContact(m);
+}
+function chooseMember(mode){$('groupSettings').hidden=true;openSheet(mode==='view'?'Информация об участниках':'Редактировать',`<div class="contact-choices">${members.slice().sort((a,b)=>String(a.lastName||'').localeCompare(String(b.lastName||''),'ru')).map(m=>`<button type="button" data-contact-id="${esc(m.id)}">${esc(m.lastName)} ${esc(m.firstName)}</button>`).join('')}</div>`);
+ $('formBody').onclick=e=>{const b=e.target.closest('[data-contact-id]');if(!b)return;const m=members.find(x=>x.id===b.dataset.contactId);if(m)(mode==='view'?viewMember(m):editMemberContact(m))};
+}
+
 async function removeMember(m){if(m.role){notice('Удалять ответственного и помощника может только секретарь');return}if(!confirm('Удалить участника '+m.lastName+' '+m.firstName+' из списка? Его JSON останется на Google Drive.'))return;try{await phoneCall('phoneRemoveMember',{memberId:m.id});await refresh();notice('Участник скрыт из группы')}catch(e){notice(e.message)}}
+
+const DECEMBER_ACK_KEY='gruppen-december-ack-v32';let reminderAcks=[];try{reminderAcks=JSON.parse(localStorage.getItem(DECEMBER_ACK_KEY)||'[]')}catch{reminderAcks=[]}
+function saveReminderAcks(){localStorage.setItem(DECEMBER_ACK_KEY,JSON.stringify(reminderAcks))}
+let decemberShownKey='';
+function decemberDate(){const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date());return Object.fromEntries(parts.map(p=>[p.type,p.value]))}
+function decemberReminder(){if(!settings.token||myRole!=='leader'||$('active').hidden||!$('overlay').hidden)return;const d=decemberDate(),year=Number(d.year),day=Number(d.day);
+ if(Number(d.month)!==12||![15,22].includes(day)||Number(d.hour)<10)return;
+ const id=`${year}-${day}-${settings.token}`;if(reminderAcks.some(x=>x.id===id)||decemberShownKey===id)return;
+ decemberShownKey=id;const msg=day===15?'Наступило время проверить верность контактных данных возвещателей вашей группы! Пожалуйста, сделайте проверку в течение 14 дней.':'Время проверить верность контактных данных возвещателей вашей группы подходит к концу! У вас осталась ещё неделя. Пожалуйста, сделайте проверку в течение 7 дней.';
+ openSheet('Напоминание',`<div class="reminder-brand"><img src="icon-192.png" alt=""> <strong>Группы</strong></div><p>${esc(msg)}</p><p class="hint">${day} декабря ${year}</p><button id="reminderRead" class="primary">Прочитано</button>`);
+ $('reminderRead').onclick=()=>{reminderAcks.push({id,year,day,confirmed:false});saveReminderAcks();closeSheet();flushReminderAcks()};
+}
+async function flushReminderAcks(){if(!settings.token||!navigator.onLine)return;for(const r of [...reminderAcks]){if(r.confirmed)continue;try{await phoneCall('phoneReminderAck',{year:r.year,day:r.day});r.confirmed=true;saveReminderAcks()}catch(e){console.warn('Подтверждение прочтения ожидает сервера',e);break}}}
+
 const digits=Array.from(document.querySelectorAll('.code-digit')),joinedCode=$('joinedCode');
 function setDigits(text,start=0){const numbers=String(text||'').replace(/\D/g,'');if(!numbers)return;for(let i=0;i<numbers.length&&start+i<4;i++)digits[start+i].value=numbers[i];joinedCode.value=digits.map(x=>x.value).join('');digits[Math.min(start+numbers.length,3)].focus()}
 digits.forEach((field,i)=>{field.addEventListener('input',()=>{const v=field.value.replace(/\D/g,'');field.value='';setDigits(v,i);if(!v)joinedCode.value=digits.map(x=>x.value).join('')});field.addEventListener('paste',e=>{const v=e.clipboardData?.getData('text')||'';if(/\d/.test(v)){e.preventDefault();setDigits(v,i)}});field.addEventListener('keydown',e=>{if(e.key==='Backspace'){if(field.value)field.value='';else if(i>0){digits[i-1].value='';digits[i-1].focus()}joinedCode.value=digits.map(x=>x.value).join('');e.preventDefault()}else if(e.key==='ArrowLeft'&&i>0){e.preventDefault();digits[i-1].focus()}else if(e.key==='ArrowRight'&&i<3){e.preventDefault();digits[i+1].focus()}});field.addEventListener('focus',()=>field.select())});
@@ -118,7 +149,8 @@ $('loginForm').onsubmit=async e=>{e.preventDefault();if(requesting)return;const 
 $('check').onclick=refresh;$('calendarToggle').onclick=()=>{$('monthPanel').hidden=!$('monthPanel').hidden;$('groupSettings').hidden=true};
 $('monthChoices').onclick=e=>{const b=e.target.closest('[data-period]');if(!b||b.disabled||b.dataset.period!==prevMonth())return;$('month').value=b.dataset.period;$('monthPanel').hidden=true;refresh()};
 $('gear').onclick=()=>{$('groupSettings').hidden=!$('groupSettings').hidden;$('monthPanel').hidden=true};
-$('addMember').onclick=addMember;$('reorderToggle').onclick=()=>{reorderMode=!reorderMode;$('reorderToggle').textContent=reorderMode?'Завершить изменение порядка':'Изменить порядок участников';$('groupSettings').hidden=true;render()};
+$('addMember').onclick=addMember;
+$('editContacts').onclick=()=>chooseMember('edit');$('viewContacts').onclick=()=>chooseMember('view');$('reorderToggle').onclick=()=>{reorderMode=!reorderMode;$('reorderToggle').textContent=reorderMode?'Завершить изменение порядка':'Изменить порядок участников';$('groupSettings').hidden=true;render()};
 $('aboutApp').onclick=()=>{$('groupSettings').hidden=true;openSheet('О программе',`<div class="about-app"><strong>Группы</strong><p>Версия для iPhone: ${esc(APP_VERSION)}</p><p>Отчёты участников и управление группой</p></div>`)};
 $('groupInfo').onclick=()=>{$('groupSettings').hidden=true;openSheet('Информация о группе',`<div class="about-app"><p><strong>Группа ${esc(group||'—')}</strong></p><p>Количество участников: <strong>${members.length}</strong></p></div>`)};
 $('notifyToggle').onclick=()=>{if(!('Notification'in window)){notice('Уведомления не поддерживаются в этом браузере');return}Notification.requestPermission().then(p=>notice(p==='granted'?'Уведомления разрешены':'Уведомления не разрешены'))};
@@ -129,6 +161,7 @@ $('members').onclick=async e=>{const edit=e.target.closest('[data-edit]'),up=e.t
 $('close').onclick=closeSheet;$('overlay').onclick=e=>{if(e.target===$('overlay'))closeSheet()};
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 connectBridge();if(settings.token){loadOfflineSnapshot();if(navigator.onLine)refresh();else notice('Работа без интернета: новые отчёты сохраняются на телефоне.')}else show('login');
-window.addEventListener('online',()=>{notice('Интернет восстановлен. Отправляем сохранённые отчёты…');flushOutbox().then(()=>refresh())});
+window.addEventListener('online',()=>{notice('Интернет восстановлен. Отправляем сохранённые отчёты…');flushOutbox().then(()=>{flushReminderAcks();refresh()})});
 setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden&&navigator.onLine){if(outbox.length){if(!lastSendErrorAt||Date.now()-lastSendErrorAt>60000)flushOutbox()}else refresh()}},30000);
-setInterval(()=>{if(settings.token&&!document.hidden&&!$('active').hidden)showMonthlyReminder()},60000);
+setInterval(()=>{if(settings.token&&!document.hidden&&!$('active').hidden){showMonthlyReminder();decemberReminder();flushReminderAcks()}},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){decemberReminder();flushReminderAcks()}});

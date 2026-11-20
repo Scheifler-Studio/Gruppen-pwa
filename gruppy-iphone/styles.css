@@ -238,3 +238,11 @@ header h1{font-size:30px;line-height:1.2;margin:0;font-weight:750}
 .sheet #reportForm .report-inline-fields select.answer-placeholder{
   font-size:clamp(12px,3.5vw,15px);font-weight:400;letter-spacing:0;color:#8994a3;
 }
+
+/* Version 32 — contact cards, member list, annual reminders */
+.contact-divider{border-top:1px solid #cbd5df;margin:22px 0 10px;padding-top:15px;font-size:18px;font-weight:750;color:#253647}
+.contact-name-row{display:grid;grid-template-columns:1fr 1.25fr;gap:12px}.contact-name-row label{min-width:0}
+.contact-view>div{padding:11px 2px;border-bottom:1px solid #e5e8ef;display:flex;flex-direction:column;gap:4px}.contact-view span{color:#607184;font-size:13px}.contact-view strong{font-size:17px;font-weight:550;overflow-wrap:anywhere}
+.contact-actions{display:flex;gap:12px;margin-top:20px}.contact-actions button{flex:1;padding:13px;border:1px solid #dce2e9;border-radius:10px}
+.contact-choices button{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid #d8dde5;padding:13px 4px;color:#1b2b3a}
+.reminder-brand{display:flex;align-items:center;gap:12px;padding:12px 0}.reminder-brand img{width:52px;height:52px;border-radius:13px}.reminder-brand strong{font-size:23px}
