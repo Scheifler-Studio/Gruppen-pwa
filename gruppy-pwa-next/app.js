@@ -368,14 +368,24 @@ $('pending').onclick=async e=>{const btn=e.target.closest('[data-approve],[data-
  catch(ex){pending=original;render();showToast('Не удалось сохранить решение: '+ex.message)}
 };document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 // PWA update management. Data/session keys remain untouched.
-const APP_VERSION=38;
+// Network changes must never invalidate the locally saved secretary session.
+let ipadReconnectBusy=false;
+function recoverIpadConnection(){
+ if(ipadReconnectBusy||!settings.scriptUrl||!navigator.onLine)return;
+ ipadReconnectBusy=true;
+ try{GoogleBridge.reconnect();connected=false;statusText('Восстанавливаем соединение…')}
+ catch(e){statusText('Нет соединения')}
+ finally{setTimeout(()=>{ipadReconnectBusy=false},1500)}
+}
+window.addEventListener('online',recoverIpadConnection);
+const APP_VERSION=39;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
  if(updateReloadPending || pageBusyForUpdate())return;
  updateReloadPending=true;
  // Avoid a loop if iOS temporarily serves the old app shell from its cache.
- const k='gruppen-ipad-v38-last-reload';
+ const k='gruppen-ipad-v39-last-reload';
  const last=Number(sessionStorage.getItem(k)||0);
  if(Date.now()-last<15000){updateReloadPending=false;return;}
  sessionStorage.setItem(k,String(Date.now()));
@@ -401,7 +411,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=38',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=39',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();
