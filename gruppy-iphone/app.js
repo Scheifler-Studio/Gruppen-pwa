@@ -261,7 +261,7 @@ async function installAppUpdate(){
   if('serviceWorker'in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();await navigator.serviceWorker.ready}}
   // Delete only this application's asset cache. Never clear localStorage, tokens or report queues.
   if('caches'in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith('gruppen-iphone-')).map(k=>caches.delete(k)))}
-  location.reload();
+  location.replace(location.pathname+"?updated="+Date.now());
  }catch(e){if(status)status.textContent='Не получилось применить обновление: '+e.message}
 }
 
@@ -272,9 +272,16 @@ $('members').addEventListener('touchstart',e=>{const row=e.target.closest('[data
 $('members').addEventListener('touchend',e=>{if(!touchStart||!e.changedTouches.length)return;const end=e.changedTouches[0],dx=end.clientX-touchStart.x,dy=end.clientY-touchStart.y,id=touchStart.id;touchStart=null;if(dx<-85&&Math.abs(dy)<50){const m=members.find(x=>x.id===id);if(m)removeMember(m)}},{passive:true});
 $('members').onclick=async e=>{const retry=e.target.closest('[data-retry-contact]');if(retry){const id=retry.dataset.retryContact;contactErrors.delete(id);render();notice('Откройте участника и повторите сохранение');return}const edit=e.target.closest('[data-edit]'),up=e.target.closest('[data-up]'),down=e.target.closest('[data-down]');if(edit&&!reorderMode){const m=members.find(x=>x.id===edit.dataset.edit);if(m)editReport(m);return}if(up||down){const id=up?.dataset.up||down.dataset.down;const sorted=members.slice().sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);return (ai<0?9999:ai)-(bi<0?9999:bi)});const index=sorted.findIndex(m=>m.id===id),next=index+(up?-1:1);if(next<0||next>=sorted.length)return;[sorted[index],sorted[next]]=[sorted[next],sorted[index]];const ids=sorted.map(m=>m.id);try{await phoneCall('phoneReorder',{ids});order=ids;render()}catch(ex){notice(ex.message)}}};
 $('close').onclick=closeSheet;$('overlay').onclick=e=>{if(e.target===$('overlay'))closeSheet()};
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=36',{updateViaCache:'none'}).catch(()=>{});
 connectBridge();checkAppUpdate(false);if(settings.token){loadOfflineSnapshot();if(navigator.onLine){flushContactOutbox();refresh()}else notice('Работа без интернета: новые отчёты сохраняются на телефоне.')}else show('login');
-window.addEventListener('online',()=>{notice('Интернет восстановлен. Отправляем сохранённые отчёты…');Promise.all([flushOutbox(),flushContactOutbox()]).then(()=>{flushReminderAcks();refresh()})});
+let phoneNetworkRecovery=false;
+function recoverPhoneConnection(){
+ if(phoneNetworkRecovery||!navigator.onLine)return;
+ phoneNetworkRecovery=true;
+ try{GoogleBridge.reconnect();bridgeInitialized=true}catch(e){console.warn('Подключение ожидает сеть',e)}
+ setTimeout(()=>{phoneNetworkRecovery=false;if(settings.token){refresh();flushOutbox();flushContactOutbox();flushReminderAcks()}},1800);
+}
+window.addEventListener('online',()=>{notice('Соединение восстановлено. Синхронизируем данные…');recoverPhoneConnection()});
 setInterval(()=>{if(settings.token&&!document.hidden&&$('overlay').hidden&&navigator.onLine){if(contactOutbox.length&&(!contactSendFailedAt||Date.now()-contactSendFailedAt>60000))flushContactOutbox();if(outbox.length){if(!lastSendErrorAt||Date.now()-lastSendErrorAt>60000)flushOutbox()}else if(!contactOutbox.length)refresh()}},30000);
 setInterval(()=>{if(settings.token&&!document.hidden&&!$('active').hidden){showMonthlyReminder();decemberReminder();flushReminderAcks()}},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){decemberReminder();flushReminderAcks();checkAppUpdate(false)}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){decemberReminder();flushReminderAcks();checkAppUpdate(false);if(settings.token&&navigator.onLine){refresh();flushOutbox();flushContactOutbox()}}});

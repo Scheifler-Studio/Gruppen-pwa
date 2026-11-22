@@ -59,5 +59,5 @@ const GoogleBridge=(()=>{
       send();
     });
   }
-  return {connect,disconnect,call,normalizeUrl,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)},get ready(){return ready}};
+  return {connect,disconnect,reconnect(){const url=currentUrl;if(url){disconnect();connect(url)}},call,normalizeUrl,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn)},get ready(){return ready}};
 })();
