@@ -29,25 +29,91 @@ function updateSidebarMonth(){const el=$('sidebarMonthLabel');if(el)el.textConte
 updateSidebarMonth();
 const roleTitle=r=>r==='leader'?'Ответственный за группу':r==='assistant'?'Помощник ответственного':'—';
 function showToast(t){$('toast').textContent=t;$('toast').hidden=false;setTimeout(()=>$('toast').hidden=true,4000)}
-let backgroundSaveCount=0;
+// v41: durable, optimistic write queue. Never discard queued changes during bootstrap polling.
+const OUTBOX_KEY='gruppen-ipad-write-outbox-v41';
+const SNAPSHOT_KEY='gruppen-ipad-last-snapshot-v41';
+let writeQueue=[];let sendingQueue=false;let queueRetryTimer=null;let localRevision=0;
 const memberSendStatus=new Map();
+try{const saved=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');if(Array.isArray(saved))writeQueue=saved.filter(x=>x&&x.id&&x.type&&x.data)}catch{}
+function storeWriteQueue(){try{localStorage.setItem(OUTBOX_KEY,JSON.stringify(writeQueue));return true}catch(e){showToast('Недостаточно памяти iPad для сохранения очереди!');return false}}
+function cacheVisibleSnapshot(){try{localStorage.setItem(SNAPSHOT_KEY,JSON.stringify({groups,members,reports,month:$('reportMonth').value,pending,groupEvents,reminderReceipts,pendingCodes}))}catch(e){}}
+function localMemberId(){return 'local-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2))}
+function queuePendingForMember(id){return writeQueue.some(x=>String(x.memberId||x.data?.memberId||x.data?.member?.id)===String(id))}
 function setMemberSendStatus(id,status){if(!id)return;memberSendStatus.set(String(id),status);render();if(status==='done')setTimeout(()=>{if(memberSendStatus.get(String(id))==='done'){memberSendStatus.delete(String(id));render()}},5000)}
-function saveInBackground(task,onSuccess,onError,memberId){
- if(memberId)setMemberSendStatus(memberId,'pending');
- backgroundSaveCount++;
- showToast('Отправляется на сервер…');
- Promise.resolve().then(task).then(async result=>{
-   backgroundSaveCount--;
-   showToast('Сохранено на сервере');
-   if(memberId)setMemberSendStatus(memberId,'done');
-   if(onSuccess)await onSuccess(result);
- }).catch(err=>{
-   backgroundSaveCount--;
-   if(memberId)setMemberSendStatus(memberId,'failed');
-   showSaveFailure(err,()=>saveInBackground(task,onSuccess,onError,memberId));
-   if(onError)onError(err);
- });
+function optimisticOperation(op){
+ if(op.type==='member'){
+  const m=op.data.member;const i=members.findIndex(x=>String(x.id)===String(op.memberId));
+  const draft={...(i<0?{}:members[i]),...m,id:op.memberId,addedAt:m.addedAt||members[i]?.addedAt||new Date().toISOString()};
+  if(i<0)members.push(draft);else members[i]=draft;
+ }else if(op.type==='report'){
+  const r=op.data;const i=reports.findIndex(x=>String(x.memberId)===String(r.memberId)&&String(x.month)===String(r.month));
+  if(r.month===$('reportMonth').value){const draft={...r,answer:['V','UV'].includes(r.category)?r.answer:null};if(i<0)reports.push(draft);else reports[i]=draft}
+  const m=members.find(x=>String(x.id)===String(r.memberId));if(m&&m.category!==r.category){m.category=r.category}
+ }else if(op.type==='group'){
+  if(!groups.some(g=>String(g.id)===String(op.groupId)))groups.push({id:op.groupId,name:op.data.name,createdAt:new Date().toISOString()});
+ }
 }
+function applyPendingWrites(){writeQueue.forEach(optimisticOperation)}
+function queueWrite(type,data,memberId,options={}){
+ const op={id:localMemberId(),type,data,memberId:memberId||null,groupId:options.groupId||null,replaceRole:!!options.replaceRole};
+ writeQueue.push(op);localRevision++;if(!storeWriteQueue()){writeQueue.pop();return false}
+ optimisticOperation(op);cacheVisibleSnapshot();if(memberId)memberSendStatus.set(String(memberId),'pending');render();
+ showToast('Сохранено на iPad · ожидание отправки');
+ drainWriteQueue();return true;
+}
+function retryWritesSoon(delay=3500){clearTimeout(queueRetryTimer);queueRetryTimer=setTimeout(drainWriteQueue,delay)}
+async function drainWriteQueue(){
+ if(sendingQueue||!writeQueue.length||!isConnected()||!navigator.onLine)return;
+ sendingQueue=true;
+ try{
+  while(writeQueue.length&&isConnected()&&navigator.onLine){
+   const op=writeQueue[0];
+   let completedMemberId=op.memberId;
+   try{
+    let result;
+    if(op.type==='member'){
+      const member={...op.data.member};if(String(member.id||'').startsWith('local-'))delete member.id;
+      result=await post('/api/admin/member',{member,...(op.replaceRole?{replaceRole:true}:{})});
+      if(result?.conflict){const yes=confirm('В этой группе уже назначен(а) '+result.conflict.name+'. Заменить назначение?');if(yes){op.replaceRole=true;storeWriteQueue();retryWritesSoon(200);break}showToast('Назначение не изменено. Измени данные или попробуй позже.');memberSendStatus.set(String(op.memberId),'failed');break}
+      if(result?.memberId&&String(op.memberId).startsWith('local-')){
+       const old=String(op.memberId),real=String(result.memberId);completedMemberId=real;
+       members=members.map(m=>String(m.id)===old?{...m,id:real}:m);
+       if(memberSendStatus.has(old)){memberSendStatus.set(real,memberSendStatus.get(old));memberSendStatus.delete(old)}
+       for(const next of writeQueue.slice(1)){
+        if(String(next.memberId)===old)next.memberId=real;
+        if(String(next.data?.memberId)===old)next.data.memberId=real;
+        if(String(next.data?.member?.id)===old)next.data.member.id=real;
+       }
+      }
+    }else if(op.type==='report')result=await post('/api/admin/report',op.data);
+    else if(op.type==='group'){
+      // The group creation API does not return a group ID, so reconcile before dependent edits.
+      result=await post('/api/admin/group',op.data);
+      const snapshot=await callGoogle('bootstrap',{month:$('reportMonth').value});
+      const match=(snapshot.groups||[]).find(g=>g.name===op.data.name);
+      if(match){const old=String(op.groupId),real=String(match.id);groups=groups.map(g=>String(g.id)===old?match:g);
+       if(selected===old)selected=real;
+       for(const next of writeQueue.slice(1)){if(String(next.data?.member?.groupId)===old)next.data.member.groupId=real}
+      }
+    }
+    writeQueue.shift();localRevision++;storeWriteQueue();cacheVisibleSnapshot();
+    if(completedMemberId&&!queuePendingForMember(completedMemberId))setMemberSendStatus(completedMemberId,'done');
+    else render();
+   }catch(err){
+    const msg=String(err?.message||err);
+    if(err?.status===409&&err?.data?.conflict){const yes=confirm('Назначение занято: '+err.data.conflict.name+'. Заменить?');if(yes){op.replaceRole=true;storeWriteQueue();retryWritesSoon(1000);break}}
+    if(/Сессия секретаря закончилась|Авторизация секретаря|Неверный пароль/i.test(msg))statusText('Нужен вход секретаря');
+    // Keep the operation, including on timeout: server may have committed it.
+    showToast('Изменения ожидают отправки: '+msg.slice(0,90));
+    if(op.memberId)memberSendStatus.set(String(op.memberId),'pending');
+    retryWritesSoon(12000);break;
+   }
+  }
+ }finally{sendingQueue=false;render();if(!writeQueue.length&&isConnected())refresh()}
+}
+window.addEventListener('online',()=>{retryWritesSoon(1500)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)retryWritesSoon(700)});
+setInterval(()=>{if(writeQueue.length&&!document.hidden)drainWriteQueue()},15000);
 function showSaveFailure(error,retry){
  const box=$('saveFailure');
  $('saveFailureMessage').textContent='Не удалось сохранить на сервере: '+String(error?.message||error)+'. Данные не подтверждены. Попробуй повторить.';
@@ -70,7 +136,7 @@ $('connectDismiss').onclick=()=>$('connectOverlay').hidden=true;
 function saveSettings(){localStorage.setItem(LS,JSON.stringify(settings))}
 function isConnected(){return connected&&!!token&&GoogleBridge.ready}
 function statusText(t){const el=$('sync');el.textContent=t;const active=/подключён|подключено/i.test(t)&&!/не подключён|не подключено/i.test(t);el.classList.toggle('connected',active);el.classList.toggle('disconnected',!active)}
-function checkConnection(){if(!isConnected()){showToast('Сначала подключи Google Drive в настройках');showSettings();return false}return true}
+function checkConnection(){if(!isConnected()&&!groups.length){showToast('Для первой загрузки данных подключи Google Drive в настройках');showSettings();return false}return true}
 function callGoogle(action,payload){return GoogleBridge.call(action,payload,token)}
 async function post(path,obj){
  if(!isConnected())throw Error('Google Drive не подключён. Открой настройки.');
@@ -81,14 +147,17 @@ async function post(path,obj){
  return r;
 }
 async function refresh(){
+ const startingRevision=localRevision;
  if(!isConnected()){statusText('Сервер недоступен');render();return}
  try{
-  const a=await callGoogle('bootstrap',{month:$('reportMonth').value});
+  const requestedMonth=$('reportMonth').value;
+  const a=await callGoogle('bootstrap',{month:requestedMonth});
+  if(startingRevision!==localRevision||requestedMonth!==$('reportMonth').value){if(!writeQueue.length)setTimeout(refresh,400);return;}
   groups=Array.isArray(a.groups)?a.groups:[];
   members=Array.isArray(a.members)?a.members:[];
   reports=Array.isArray(a.reports)?a.reports:[];
   pending=Array.isArray(a.pending)?a.pending.filter(p=>!p.status||p.status==='pending'):[];groupEvents=Array.isArray(a.events)?a.events:[];reminderReceipts=Array.isArray(a.reminders?.receipts)?a.reminders.receipts:[];pendingCodes=a.pendingCodes||{};
-  localPreview=false;statusText('Сервер подключён');render();
+  localPreview=false;applyPendingWrites();cacheVisibleSnapshot();statusText('Сервер подключён');render();if(writeQueue.length)retryWritesSoon(100);
  }catch(e){const expired=/Сессия секретаря закончилась/i.test(String(e.message||e));statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');showToast(e.message);render()}
 }
 async function loginAndTest(password){
@@ -96,7 +165,7 @@ async function loginAndTest(password){
  else {const r=await GoogleBridge.call('login',{password});token=r.token;localStorage.setItem(sessionKey,token);sessionStorage.setItem(sessionKey,token)}
  const test=await GoogleBridge.call('test',{},token);
  if(!test?.ok)throw Error('Не удалось подтвердить запись в Google Drive');
- connected=true;await refresh();return test;
+ connected=true;await refresh();if(writeQueue.length)retryWritesSoon(250);return test;
 }
 function initBridge(url){GoogleBridge.connect(url);connected=false;statusText('Подключение к Google…')}
 const GROUP_COLORS=[
@@ -274,16 +343,11 @@ function showSettings(){
   }catch(e){showToast(e.message)}
  };
 }
-function showGroup(){if(!checkConnection())return;openModal('Новая группа','<form id="groupForm"><label class="field">Название группы<input name="name" required maxlength="100" placeholder="Например, A1"></label><div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Создать</button></div></form>');$('cancel').onclick=closeModal;$('groupForm').onsubmit=e=>{e.preventDefault();const name=e.currentTarget.elements.name.value.trim();if(!name)return;closeModal();saveInBackground(()=>post('/api/admin/group',{name}),()=>refresh())}}
+function showGroup(){if(!checkConnection())return;openModal('Новая группа','<form id="groupForm"><label class="field">Название группы<input name="name" required maxlength="100" placeholder="Например, A1"></label><div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Создать</button></div></form>');$('cancel').onclick=closeModal;$('groupForm').onsubmit=e=>{e.preventDefault();const name=e.currentTarget.elements.name.value.trim();if(!name)return;closeModal();queueWrite('group',{name},null,{groupId:localMemberId()})}}
 function showMember(m=null){if(!checkConnection())return;if(!groups.length){showToast('Сначала создай группу');return}const grp=m?.groupId||(['all','none'].includes(selected)?groups[0].id:selected),role=m?.role||'';openModal(m?'Карточка участника':'Новый участник',`<form id="memberForm" class="compact-member-form"><div class="member-name-row"><label class="field">Имя<input required name="firstName" value="${esc(m?.firstName||'')}"></label><label class="field">Фамилия<input required name="lastName" value="${esc(m?.lastName||'')}"></label></div><div class="member-role-row"><label class="field group-small">Группа<select name="groupId">${groups.map(g=>`<option value="${esc(g.id)}" ${g.id===grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><label class="field">Назначить<select name="role"><option value="">Выбрать</option><option value="leader" ${role==='leader'?'selected':''}>Ответственный за группу</option><option value="assistant" ${role==='assistant'?'selected':''}>Помощник</option></select></label><label id="codeField" class="field code-small" ${role?'':'hidden'}>Код<input name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="••••" value="${esc(m?pendingCodes[String(m.id)]||'':'')}"></label></div><label class="field">Вид служения<select name="category"><option value="">Не указана</option>${serviceTypes.map(x=>`<option ${m?.category===x?'selected':''}>${x}</option>`).join('')}</select></label>${m?`<p class="hint">Дата создания: ${esc(date(m.addedAt))}<br>Файл: ${esc(m.fileName||'')}</p>`:''}${m?`<div class="archive-area"><button type="button" class="archive-action" id="archiveMember">Удалить участника</button></div>`:''}<div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Сохранить</button></div></form>`);const form=$('memberForm');form.elements.role.onchange=()=>{const has=!!form.elements.role.value;$('codeField').hidden=!has;form.elements.code.required=false};form.elements.groupId.onchange=()=>form.elements.role.onchange();form.elements.role.onchange();$('cancel').onclick=closeModal;if(m){$('archiveMember').onclick=()=>{openModal('Удаление участника',`<p>Вы действительно хотите удалить из активного списка <strong>${esc(m.lastName)} ${esc(m.firstName)}</strong>?</p><p class="hint">JSON и прежние отчёты останутся на Google Drive. Если участник имеет назначение, доступ его телефона будет отозван.</p><div class="actions"><button class="secondary" id="archiveCancel" type="button">Отмена</button><button class="danger-button" id="archiveConfirm" type="button">Удалить</button></div>`);$('archiveCancel').onclick=()=>showMember(m);$('archiveConfirm').onclick=async()=>{const b=$('archiveConfirm');b.disabled=true;b.textContent='Удаление…';try{await post('/api/admin/archive',{memberId:m.id});members=members.filter(x=>x.id!==m.id);closeModal();render();showToast('Участник удалён из активного списка');await refresh()}catch(ex){b.disabled=false;b.textContent='Удалить';showToast(ex.message)}}}};form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget.elements,obj={id:m?.id,firstName:f.firstName.value.trim(),lastName:f.lastName.value.trim(),groupId:f.groupId.value,role:f.role.value,code:(f.code.value.trim()===(m?pendingCodes[String(m.id)]||'':''))?'':f.code.value.trim(),address:m?.address||'',phone:m?.phone||'',phone2:m?.phone2||'',trustedFirstName:m?.trustedFirstName||'',trustedLastName:m?.trustedLastName||'',trustedPhone:m?.trustedPhone||'',category:f.category.value,categoryMonth:$('reportMonth').value,addedAt:m?.addedAt,fileName:m?.fileName};if(obj.code&&!/^\d{4}$/.test(obj.code))return showToast('Введите четырёхзначное число');closeModal();
- const send=replaceRole=>post('/api/admin/member',{member:obj,...(replaceRole?{replaceRole:true}:{})});
- saveInBackground(()=>send(false),()=>refresh(),err=>{
-   if(err.status===409&&err.data?.conflict){
-     $('saveFailure').hidden=true;
-     const yes=confirm(`В этой группе уже назначен(а) ${err.data.conflict.name}.\n\nПосле подтверждения предыдущий участник потеряет должность и доступ со своего телефона. Продолжить?`);
-     if(yes)saveInBackground(()=>send(true),()=>refresh(),null,m?.id);
-   }
- },m?.id);
+ const localId=m?.id||localMemberId();obj.id=localId;
+ queueWrite('member',{member:obj},localId);
+
 }}
 function editAdminReport(m){
  if(!checkConnection())return;
@@ -300,7 +364,7 @@ function editAdminReport(m){
    catch(err){showToast('Не удалось загрузить месяц: '+err.message);}
    finally{if(f===$('adminReportForm')){f.elements.month.disabled=false;save.disabled=false}}
  };
- f.onsubmit=e=>{e.preventDefault();const b=f.querySelector('[type=submit]');if(b.disabled)return;const item={memberId:m.id,month:f.elements.month.value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};closeModal();saveInBackground(()=>post('/api/admin/report',item),async()=>{if(item.month===$('reportMonth').value){reports=reports.filter(x=>String(x.memberId)!==String(m.id));reports.push({...item,answer:['V','UV'].includes(item.category)?item.answer:null})}render();await refresh()})};
+ f.onsubmit=e=>{e.preventDefault();const b=f.querySelector('[type=submit]');if(b.disabled)return;const item={memberId:m.id,month:f.elements.month.value,category:f.elements.category.value,hours:Number(f.elements.hours.value),answer:f.elements.answer.value,studies:Number(f.elements.studies.value),note:f.elements.note.value};if(['V','UV'].includes(item.category)&&!['yes','no'].includes(item.answer)){showToast('Выбери Да или Нет');return}closeModal();queueWrite('report',item,m.id)};
 }
 function showGroupExport(){
  if(selected==='all'||selected==='none')return;
@@ -377,7 +441,7 @@ function recoverIpadConnection(){
  finally{setTimeout(()=>{ipadReconnectBusy=false},1500)}
 }
 window.addEventListener('online',recoverIpadConnection);
-const APP_VERSION=40;
+const APP_VERSION=41;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
@@ -410,7 +474,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=40',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=41',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();
@@ -423,7 +487,8 @@ if('serviceWorker'in navigator){
 }
 
 try{const old=JSON.parse(localStorage.getItem(older)||'{}');if(Array.isArray(old.groups)&&Array.isArray(old.members)&&old.groups.length){groups=old.groups;members=old.members;localPreview=true}}catch{}
-statusText('Сервер недоступен');render();
+try{const snapshot=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'null');if(snapshot&&Array.isArray(snapshot.groups)){groups=snapshot.groups;members=snapshot.members||[];if(snapshot.month===$('reportMonth').value)reports=snapshot.reports||[];pending=snapshot.pending||[];groupEvents=snapshot.groupEvents||[];reminderReceipts=snapshot.reminderReceipts||[];pendingCodes=snapshot.pendingCodes||{}}}catch(e){}
+applyPendingWrites();statusText('Сервер недоступен');render();
 if(settings.scriptUrl){try{initBridge(settings.scriptUrl);if(token){GoogleBridge.subscribe(state=>{if(state==='ready'&&!connected){loginAndTest('').catch(e=>{const msg=String(e.message||e);const expired=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(msg);statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');if(expired)showToast('Не удалось подтвердить сохранённый вход: '+msg)})}})}}catch(e){statusText('Некорректная ссылка Google')}}
 setInterval(()=>{if(isConnected()&&!document.hidden)refresh()},30000);
 
