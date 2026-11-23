@@ -441,7 +441,7 @@ function recoverIpadConnection(){
  finally{setTimeout(()=>{ipadReconnectBusy=false},1500)}
 }
 window.addEventListener('online',recoverIpadConnection);
-const APP_VERSION=42;
+const APP_VERSION=43;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
