@@ -350,3 +350,6 @@
 .member-sync.done,.member-sync.failed{border:0!important;animation:none!important}
 @keyframes memberArrowTurn{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.member-sync.pending::after{animation-duration:2.5s}}
+
+/* Version 40: single, readable software-update status. */
+.app-version-state{font-weight:600;line-height:1.4;margin:12px 0 16px}

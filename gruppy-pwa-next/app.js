@@ -89,7 +89,7 @@ async function refresh(){
   reports=Array.isArray(a.reports)?a.reports:[];
   pending=Array.isArray(a.pending)?a.pending.filter(p=>!p.status||p.status==='pending'):[];groupEvents=Array.isArray(a.events)?a.events:[];reminderReceipts=Array.isArray(a.reminders?.receipts)?a.reminders.receipts:[];pendingCodes=a.pendingCodes||{};
   localPreview=false;statusText('Сервер подключён');render();
- }catch(e){statusText('Сервер недоступен');showToast(e.message);render()}
+ }catch(e){const expired=/Сессия секретаря закончилась/i.test(String(e.message||e));statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');showToast(e.message);render()}
 }
 async function loginAndTest(password){
  if(!password){if(!token)throw Error('Введи пароль секретаря');}
@@ -181,8 +181,7 @@ function showSettings(){
  <div id="googleStatus" class="connection-status ${isConnected()?'connected':''}">${isConnected()?'База готова к сохранению':'Не подключено'}</div>
  <div class="actions"><button class="secondary" type="button" id="testGoogle">Проверить подключение</button><button class="primary" type="submit" id="connectGoogle">Подключить Google Drive</button></div></form>
  <hr><section class="app-update-section" aria-label="Обновление программы"><h3>Обновление программы</h3>
- <p class="installed-version">Установленная версия: <strong id="installedAppVersion">38.0</strong></p>
- <p class="hint" id="appUpdateStatus" role="status" aria-live="polite">Проверяем наличие новой версии…</p>
+ <p class="hint app-version-state" id="appUpdateStatus" role="status" aria-live="polite">Проверяем наличие обновления…</p>
  <div class="actions app-update-actions"><button class="secondary" type="button" id="checkAppUpdate">Проверить обновление</button><button class="primary" type="button" id="installAppUpdate" hidden>Обновить программу</button></div>
  <p class="hint">При обновлении программа загрузит новые файлы с GitHub. Пароль, регистрация и настройки подключения сохранятся.</p></section>
  <hr><h3>Цвета групп</h3>
@@ -211,11 +210,11 @@ function showSettings(){
    newestVersion=Number(remote.version);
    if(!Number.isFinite(newestVersion))throw new Error('Неверный номер версии');
    if(newestVersion>APP_VERSION){
-    updateStatus.textContent='Доступна новая версия '+(remote.displayVersion||newestVersion+'.0')+'.';
+    updateStatus.textContent='У вас устаревшая версия '+APP_VERSION+'.0. Доступна новая версия '+(remote.displayVersion||newestVersion+'.0')+'.';
     updateButton.hidden=false;
-   }else if(newestVersion===APP_VERSION){updateStatus.textContent='Установлена актуальная версия '+APP_VERSION+'.0.';}
-   else{updateStatus.textContent='Установленная версия новее опубликованной. Дождитесь публикации файлов на GitHub.';}
-  }catch(err){updateStatus.textContent='Не удалось проверить обновление: '+err.message;}
+   }else if(newestVersion===APP_VERSION){updateStatus.textContent='У вас актуальная версия '+APP_VERSION+'.0.';}
+   else{updateStatus.textContent='У вас установлена версия '+APP_VERSION+'.0. Версия на GitHub старее.';}
+  }catch(err){updateStatus.textContent='Версия '+APP_VERSION+'.0. Проверка обновления недоступна: '+err.message;}
   finally{checkButton.disabled=false;}
  }
  checkButton.onclick=readAvailableVersion;
@@ -378,14 +377,14 @@ function recoverIpadConnection(){
  finally{setTimeout(()=>{ipadReconnectBusy=false},1500)}
 }
 window.addEventListener('online',recoverIpadConnection);
-const APP_VERSION=39;
+const APP_VERSION=40;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
  if(updateReloadPending || pageBusyForUpdate())return;
  updateReloadPending=true;
  // Avoid a loop if iOS temporarily serves the old app shell from its cache.
- const k='gruppen-ipad-v39-last-reload';
+ const k='gruppen-ipad-v40-last-reload';
  const last=Number(sessionStorage.getItem(k)||0);
  if(Date.now()-last<15000){updateReloadPending=false;return;}
  sessionStorage.setItem(k,String(Date.now()));
@@ -411,7 +410,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=39',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=40',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();
@@ -425,7 +424,7 @@ if('serviceWorker'in navigator){
 
 try{const old=JSON.parse(localStorage.getItem(older)||'{}');if(Array.isArray(old.groups)&&Array.isArray(old.members)&&old.groups.length){groups=old.groups;members=old.members;localPreview=true}}catch{}
 statusText('Сервер недоступен');render();
-if(settings.scriptUrl){try{initBridge(settings.scriptUrl);if(token){GoogleBridge.subscribe(state=>{if(state==='ready'&&!connected){loginAndTest('').catch(e=>{statusText('Требуется вход');showToast(e.message)})}})}}catch(e){statusText('Некорректная ссылка Google')}}
+if(settings.scriptUrl){try{initBridge(settings.scriptUrl);if(token){GoogleBridge.subscribe(state=>{if(state==='ready'&&!connected){loginAndTest('').catch(e=>{const msg=String(e.message||e);const expired=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(msg);statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');if(expired)showToast('Не удалось подтвердить сохранённый вход: '+msg)})}})}}catch(e){statusText('Некорректная ссылка Google')}}
 setInterval(()=>{if(isConnected()&&!document.hidden)refresh()},30000);
 
 $('reminderReceiptsButton').onclick=openReminderReceipts;
