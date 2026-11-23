@@ -19,7 +19,43 @@ function dismissEvents(keys){keys.forEach(k=>dismissedEvents.add(k));
  render();
 }
 const prevMonth=()=>{let d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
+const MIN_REPORT_MONTH='2026-01';
+$('reportMonth').min=MIN_REPORT_MONTH;
+$('reportMonth').max=prevMonth();
 $('reportMonth').value=prevMonth();
+// Keep one report period for both the left summary and the main table.
+function selectReportMonth(month){
+ const latest=prevMonth();
+ if(!/^\d{4}-\d{2}$/.test(month)||month<MIN_REPORT_MONTH||month>latest){showToast('Этот месяц недоступен для просмотра');return false}
+ if(month===$('reportMonth').value)return true;
+ $('reportMonth').value=month;
+ $('reportMonth').dataset.confirmedMonth=month;
+ $('reportMonth').max=latest;
+ reports=[]; // Never display data from another month while new reports are loading.
+ applyPendingWrites();
+ updateSidebarMonth();
+ render();
+ refresh();
+ return true;
+}
+// First day of every month, 00:00 local device time: reset to last completed month.
+let currentCalendarMonth=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+function checkReportMonthRollover(){
+ const now=new Date(),calendarMonth=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+ if(calendarMonth!==currentCalendarMonth){
+  currentCalendarMonth=calendarMonth;
+  $('reportMonth').max=prevMonth();
+  if($('reportMonth').value!==prevMonth())selectReportMonth(prevMonth());
+  else{updateSidebarMonth();render();refresh()}
+ }
+}
+function armReportMonthMidnight(){
+ const now=new Date(),next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+ setTimeout(()=>{checkReportMonthRollover();armReportMonthMidnight()},Math.max(1000,next.getTime()-now.getTime()+100));
+}
+armReportMonthMidnight();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkReportMonthRollover()});
+window.addEventListener('pageshow',checkReportMonthRollover);
 const date=s=>{if(!s)return'—';const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:s};
 const groupName=id=>groups.find(x=>x.id===id)?.name||'—';
 const reportCategory=c=>/^HPV(?:-(30|60|90))?$/.test(c||'')?'HPV':c;
@@ -230,7 +266,7 @@ function render(){const visible=members.filter(m=>!m.hidden);$('groupNav').inner
  const reportMap=new Map(reports.map(r=>[String(r.memberId),r]));
  if(showValues){const cv=document.createElement('canvas'),ctx=cv.getContext('2d');ctx.font='680 22px -apple-system, sans-serif';const width=Math.max(185,...found.map(m=>ctx.measureText((m.lastName||'')+' '+(m.firstName||'')).width+39));list.style.setProperty('--name-column',Math.min(440,Math.ceil(width))+'px')}else list.style.removeProperty('--name-column');
  const reportState=m=>{const r=reportMap.get(String(m.id));if(r)return {kind:'done',glyph:'✓',label:'Отчёт принят'};const current=$('reportMonth').value===prevMonth(),day=new Date().getDate();if(current&&day>15)return {kind:'late',glyph:'−',label:'Отчёт просрочен'};if(current&&day>10)return {kind:'warn',glyph:'−',label:'Отчёт ожидается'};return {kind:'empty',glyph:'',label:'Отчёт не представлен'}};
- const headings=showValues&&found.length?'<div class="value-head"><span class="month-heading">'+esc(monthText($('reportMonth').value))+'</span><span class="status-heading">Отчёт</span><span class="value-service-head">Вид</span><span class="value-result-head">Часы</span><span class="value-studies-head">Из.</span><span class="value-note-head">Примечание</span><span class="more-heading"></span></div>':'';
+ const headings=showValues&&found.length?'<div class="value-head"><label class="month-heading table-month-picker" title="Выбрать месяц отчётов"><span>'+esc(monthText($('reportMonth').value))+'</span><input type="month" class="table-month-input" aria-label="Выбрать месяц над таблицей" min="2026-01" max="'+prevMonth()+'" value="'+$('reportMonth').value+'"></label><span class="status-heading">Отчёт</span><span class="value-service-head">Вид</span><span class="value-result-head">Часы</span><span class="value-studies-head">Из.</span><span class="value-note-head">Примечание</span><span class="more-heading"></span></div>':'';
  list.innerHTML=selected==='none'?'<div class="initial-empty"><div class="initial-empty-icon">☰</div><strong>Выберите группу</strong><p>Нажмите «Все участники» или название группы в меню слева.</p></div>':headings+(found.map(m=>{const isOpen=expanded.has(m.id),menu=popover===m.id,r=reportMap.get(String(m.id)),cat=r?.category||m.category||'',v=(r&&['APV','HPV'].includes(reportCategory(cat)))?(r.hours??''):(r?.answer==='yes'?'Да':r?.answer==='no'?'Нет':''),studies=r&&Number(r.studies)>0?String(r.studies):'',hasNote=!!String(r?.note||'').trim(),state=reportState(m),gname=groupName(m.groupId);return `<article class="member" data-member-id="${esc(m.id)}" style="--group-row-bg:${groupColor(m.groupId)}"><div class="member-line"><span class="chip">${esc(gname)}</span><span class="name-cell"><span class="name ${m.role==='leader'?'leader':m.role==='assistant'?'assistant':''}">${esc(m.lastName)} ${esc(m.firstName)}</span><button class="arrow ${isOpen?'open':''}" data-open="${esc(m.id)}" aria-label="Подробнее">›</button>${!showValues?`<span class="member-sync ${memberSendStatus.get(String(m.id))||''}" title="${memberSendStatus.get(String(m.id))==='pending'?'Отправка данных':memberSendStatus.get(String(m.id))==='done'?'Сохранено':''}" aria-hidden="true"></span>`:''}</span>${showValues?`<span class="status-cell" title="${esc(state.label)}" aria-label="${esc(state.label)}"><span class="status-dot ${state.kind}">${state.glyph}</span></span><span class="value-service">${esc(cat)}</span><span class="value-result">${esc(v)}</span><span class="value-studies">${esc(studies)}</span><span class="value-note">${hasNote?`<button class="note-pill" data-note="${esc(m.id)}" aria-label="Читать примечание">Примечание</button>`:''}<span class="member-sync ${memberSendStatus.get(String(m.id))||''}" title="${memberSendStatus.get(String(m.id))==='pending'?'Отправка данных':memberSendStatus.get(String(m.id))==='done'?'Сохранено':''}" aria-hidden="true"></span></span>`:''}<button class="more" data-menu="${esc(m.id)}" aria-label="Действия">···</button></div>${menu?`<div class="pop" style="top:${popoverPosition.top}px;left:${popoverPosition.left}px"><button data-edit="${esc(m.id)}">Редактировать</button><hr><button data-report="${esc(m.id)}">Отчёт</button></div>`:''}${isOpen?`<div class="member-detail">${m.role?`<div><span class="detail-label">Назначение</span><b class="${m.role==='leader'?'leader':'assistant'}">${roleTitle(m.role)}</b></div>`:''}<div><span class="detail-label">Группа</span>${esc(gname)}</div><div><span class="detail-label">Дата создания</span>${date(m.addedAt)}</div>${r?`<div><span class="detail-label">${esc(monthText(r.month))}</span>${esc(cat)} · ${esc(v||'—')} · изучения: ${esc(studies||'0')}</div>`:''}</div>`:''}</article>`}).join('')||'<div class="empty">Участников пока нет. Нажми «+», чтобы создать группу или участника.</div>');
 
  const summary={APV:{n:0,h:0,s:0},HPV:{n:0,h:0,s:0},V:{n:0,h:0,s:0},UV:{n:0,h:0,s:0}};
@@ -411,7 +447,7 @@ function showGroupExport(){
 $('groupExportButton').onclick=showGroupExport;
 $('foldGroups').onclick=()=>{groupOpen=!groupOpen;$('groupNav').hidden=!groupOpen;$('foldGroups').classList.toggle('open',groupOpen)};
 $('toggleReports').onclick=()=>{reportOpen=!reportOpen;$('reportContent').hidden=!reportOpen;$('reportArrow').classList.toggle('open',reportOpen)};
-$('toggleValues').onclick=()=>{showValues=!showValues;popover=null;render()};$('refreshData').onclick=async()=>{const b=$('refreshData');if(b.disabled)return;b.disabled=true;b.classList.add('spinning');try{await refresh()}finally{b.disabled=false;b.classList.remove('spinning')}};$('reportMonth').onchange=()=>{updateSidebarMonth();refresh()};$('groupFilterButton').onclick=()=>{$('groupFilterOptions').hidden=!$('groupFilterOptions').hidden};
+$('toggleValues').onclick=()=>{showValues=!showValues;popover=null;render()};$('refreshData').onclick=async()=>{const b=$('refreshData');if(b.disabled)return;b.disabled=true;b.classList.add('spinning');try{await refresh()}finally{b.disabled=false;b.classList.remove('spinning')}};$('reportMonth').onchange=e=>{const month=e.target.value;const previous=$('reportMonth').dataset.confirmedMonth||prevMonth();e.target.value=previous;if(selectReportMonth(month))e.target.dataset.confirmedMonth=month};$('reportMonth').dataset.confirmedMonth=prevMonth();$('list').addEventListener('change',e=>{if(e.target.matches('.table-month-input'))selectReportMonth(e.target.value)});$('groupFilterButton').onclick=()=>{$('groupFilterOptions').hidden=!$('groupFilterOptions').hidden};
 $('groupFilterOptions').onchange=e=>{
  const input=e.target;if(input.type!=='checkbox')return;
  if(input.dataset.filterAll!==undefined){settings.groupFilterIds=[]}
@@ -485,7 +521,7 @@ async function retrySavedSession(){
 }
 setInterval(()=>{if(!document.hidden)retrySavedSession()},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)retrySavedSession()});
-const APP_VERSION=46;
+const APP_VERSION=47;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
@@ -518,7 +554,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=45',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=47',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();

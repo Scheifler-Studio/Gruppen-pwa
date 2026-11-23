@@ -1,5 +1,5 @@
-const CACHE='gruppen-ipad-v46';
-const FILES=['./','./index.html','./app.js?v=46','./group-export.js?v=46','./bridge-client.js?v=46','./styles.css?v=46','./manifest.webmanifest','./version.json','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
+const CACHE='gruppen-ipad-v47';
+const FILES=['./','./index.html','./app.js?v=47','./group-export.js?v=47','./bridge-client.js?v=47','./styles.css?v=47','./manifest.webmanifest','./version.json','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));
 });
