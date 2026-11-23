@@ -478,3 +478,16 @@
 #sync.server-state.connecting{background:#e3f0ff;color:#265e9b;border-color:#bad6f6}
 .connection-status.connecting{background:#e3f0ff;color:#265e9b;border-color:#bad6f6}
 .connection-status.disconnected{background:#f7eae7;color:#994134;border-color:#e8c9c4}
+
+/* v45 — gentle moving highlight means the server connection is in progress. */
+#sync.server-state.connecting{
+ position:relative;overflow:hidden;isolation:isolate;
+ background:#e3f0ff!important;color:#265e9b!important;
+}
+#sync.server-state.connecting::after{
+ content:"";position:absolute;pointer-events:none;inset:0 auto 0 -45%;width:38%;
+ background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.06) 15%,rgba(255,255,255,.95) 48%,rgba(255,255,255,.06) 85%,transparent 100%);
+ transform:skewX(-17deg);animation:connectionShine45 2.4s ease-in-out infinite;
+}
+@keyframes connectionShine45{0%{left:-45%}65%,100%{left:110%}}
+@media(prefers-reduced-motion:reduce){#sync.server-state.connecting::after{animation:none;display:none}}
