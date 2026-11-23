@@ -135,7 +135,34 @@ function finishConnectionProgress(error){
 $('connectDismiss').onclick=()=>$('connectOverlay').hidden=true;
 function saveSettings(){localStorage.setItem(LS,JSON.stringify(settings))}
 function isConnected(){return connected&&!!token&&GoogleBridge.ready}
-function statusText(t){const el=$('sync');el.textContent=t;const active=/подключён|подключено/i.test(t)&&!/не подключён|не подключено/i.test(t);el.classList.toggle('connected',active);el.classList.toggle('disconnected',!active)}
+// One authoritative UI state for the top bar and the currently open Settings modal.
+let serverUiState='connecting';
+function statusText(t){
+ const message=String(t||'');
+ const auth=/Нужен вход|Требуется вход|парол/i.test(message);
+ const success=message==='Сервер подключён' && isConnected();
+ const connecting=!success&&!auth&&/Подключ|Восстанавлив|Провер|Соединяем/i.test(message);
+ serverUiState=success?'connected':auth?'auth':connecting?'connecting':'offline';
+ const label=success?'Сервер подключён':auth?'Требуется вход секретаря':connecting?'Подключение к серверу…':'Сервер недоступен';
+ const top=$('sync');top.textContent=label;
+ top.classList.toggle('connected',success);
+ top.classList.toggle('disconnected',serverUiState==='offline'||serverUiState==='auth');
+ top.classList.toggle('connecting',serverUiState==='connecting');
+ const settingsStatus=$('googleStatus');
+ if(settingsStatus){
+  settingsStatus.textContent=success?'Сервер подключён. База готова к сохранению':auth?'Требуется вход секретаря':connecting?'Соединяемся с сервером…':'Сервер недоступен. Изменения ожидают отправки';
+  settingsStatus.classList.toggle('connected',success);
+  settingsStatus.classList.toggle('connecting',connecting);
+  settingsStatus.classList.toggle('disconnected',!success&&!connecting);
+ }
+ const form=$('settingsForm');
+ if(form&&form.elements.scriptUrl){
+  let same=false;try{same=GoogleBridge.normalizeUrl(form.elements.scriptUrl.value)===settings.scriptUrl}catch(e){}
+  const disable=success&&same&&!form.elements.password.value.trim();
+  if($('testGoogle'))$('testGoogle').disabled=disable;
+  if($('connectGoogle'))$('connectGoogle').disabled=disable;
+ }
+}
 function checkConnection(){if(!isConnected()&&!groups.length){showToast('Для первой загрузки данных подключи Google Drive в настройках');showSettings();return false}return true}
 function callGoogle(action,payload){return GoogleBridge.call(action,payload,token)}
 async function post(path,obj){
@@ -148,7 +175,7 @@ async function post(path,obj){
 }
 async function refresh(){
  const startingRevision=localRevision;
- if(!isConnected()){statusText('Сервер недоступен');render();return}
+ if(!isConnected()){statusText(navigator.onLine?'Подключение к серверу…':'Сервер недоступен');render();return}
  try{
   const requestedMonth=$('reportMonth').value;
   const a=await callGoogle('bootstrap',{month:requestedMonth});
@@ -158,7 +185,7 @@ async function refresh(){
   reports=Array.isArray(a.reports)?a.reports:[];
   pending=Array.isArray(a.pending)?a.pending.filter(p=>!p.status||p.status==='pending'):[];groupEvents=Array.isArray(a.events)?a.events:[];reminderReceipts=Array.isArray(a.reminders?.receipts)?a.reminders.receipts:[];pendingCodes=a.pendingCodes||{};
   localPreview=false;applyPendingWrites();cacheVisibleSnapshot();statusText('Сервер подключён');render();if(writeQueue.length)retryWritesSoon(100);
- }catch(e){const expired=/Сессия секретаря закончилась/i.test(String(e.message||e));statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');showToast(e.message);render()}
+ }catch(e){const expired=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(String(e.message||e));connected=false;statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');showToast(e.message);render()}
 }
 async function loginAndTest(password){
  if(!password){if(!token)throw Error('Введи пароль секретаря');}
@@ -247,7 +274,7 @@ function showSettings(){
  <p class="hint">Сначала подключи Google Drive. Без подтверждённой связи создание участников и групп заблокировано. Ссылка — опубликованный адрес Google Apps Script, оканчивающийся на /exec.</p>
  <label class="field">Адрес Google Apps Script<input name="scriptUrl" type="url" autocomplete="off" value="${esc(settings.scriptUrl||'')}" placeholder="https://script.google.com/macros/s/…/exec" required></label>
  <label class="field">Пароль<input name="password" type="password" autocomplete="off" placeholder="Пароль из ADMIN_PASSWORD"></label>
- <div id="googleStatus" class="connection-status ${isConnected()?'connected':''}">${isConnected()?'База готова к сохранению':'Не подключено'}</div>
+ <div id="googleStatus" class="connection-status" role="status"></div>
  <div class="actions"><button class="secondary" type="button" id="testGoogle">Проверить подключение</button><button class="primary" type="submit" id="connectGoogle">Подключить Google Drive</button></div></form>
  <hr><section class="app-update-section" aria-label="Обновление программы"><h3>Обновление программы</h3>
  <p class="hint app-version-state" id="appUpdateStatus" role="status" aria-live="polite">Проверяем наличие обновления…</p>
@@ -310,12 +337,13 @@ function showSettings(){
  form.elements.scriptUrl.addEventListener('input',updateConnectionButtons);
  form.elements.password.addEventListener('input',updateConnectionButtons);
  updateConnectionButtons();
+ statusText(serverUiState==='connected'?'Сервер подключён':serverUiState==='auth'?'Нужен вход секретаря':serverUiState==='connecting'?'Подключение к серверу…':'Сервер недоступен');
  async function submitSettings(runLogin){
   const url=GoogleBridge.normalizeUrl(form.elements.scriptUrl.value);
   const changed=url!==settings.scriptUrl;
   if(changed){settings.scriptUrl=url;saveSettings();token='';sessionStorage.removeItem(sessionKey);localStorage.removeItem(sessionKey);initBridge(url)}
   else if(!GoogleBridge.ready)initBridge(url);
-  $('googleStatus').textContent='Проверка Google Drive…';
+  statusText('Подключение к серверу…');
   const submittedPassword=runLogin?form.elements.password.value:'';
   if(runLogin){$('connectGoogle').disabled=true;showConnectionProgress();closeModal()}
   try{
@@ -324,10 +352,10 @@ function showSettings(){
      finishConnectionProgress(null);
    } else {
      await GoogleBridge.call('ping',{});
-     if($('googleStatus'))$('googleStatus').textContent='Скрипт доступен. Для записи войди с паролем.';
-     if(token){const test=await loginAndTest('');if($('googleStatus'))$('googleStatus').textContent='Подключено: '+test.folder}
+     if(!token)statusText('Нужен вход секретаря');
+     if(token){const test=await loginAndTest('');statusText('Сервер подключён')}
    }
-  }catch(e){connected=false;if($('googleStatus'))$('googleStatus').textContent='Ошибка: '+e.message;statusText('Сервер недоступен');if(runLogin)finishConnectionProgress(e);else showToast(e.message)}
+  }catch(e){connected=false;statusText(/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(String(e.message||e))?'Нужен вход секретаря':'Сервер недоступен');if(runLogin)finishConnectionProgress(e);else showToast(e.message)}
   finally{const b=$('connectGoogle');if(b)b.disabled=false}
  }
  form.onsubmit=e=>{e.preventDefault();submitSettings(true)};
@@ -441,7 +469,23 @@ function recoverIpadConnection(){
  finally{setTimeout(()=>{ipadReconnectBusy=false},1500)}
 }
 window.addEventListener('online',recoverIpadConnection);
-const APP_VERSION=43;
+// Retry a saved session while the app is open. Never erase the token on network errors.
+let lastSessionRetry=0, sessionRetryBusy=false;
+async function retrySavedSession(){
+ if(sessionRetryBusy||connected||!token||!settings.scriptUrl||!navigator.onLine||!GoogleBridge.ready)return;
+ if(Date.now()-lastSessionRetry<20000)return;
+ sessionRetryBusy=true;lastSessionRetry=Date.now();
+ statusText('Подключение к серверу…');
+ try{await loginAndTest('')}
+ catch(e){
+  const auth=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(String(e.message||e));
+  connected=false;statusText(auth?'Нужен вход секретаря':'Сервер недоступен');
+ }
+ finally{sessionRetryBusy=false}
+}
+setInterval(()=>{if(!document.hidden)retrySavedSession()},20000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)retrySavedSession()});
+const APP_VERSION=44;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
@@ -474,7 +518,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=42',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=44',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();
@@ -488,8 +532,8 @@ if('serviceWorker'in navigator){
 
 try{const old=JSON.parse(localStorage.getItem(older)||'{}');if(Array.isArray(old.groups)&&Array.isArray(old.members)&&old.groups.length){groups=old.groups;members=old.members;localPreview=true}}catch{}
 try{const snapshot=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'null');if(snapshot&&Array.isArray(snapshot.groups)){groups=snapshot.groups;members=snapshot.members||[];if(snapshot.month===$('reportMonth').value)reports=snapshot.reports||[];pending=snapshot.pending||[];groupEvents=snapshot.groupEvents||[];reminderReceipts=snapshot.reminderReceipts||[];pendingCodes=snapshot.pendingCodes||{}}}catch(e){}
-applyPendingWrites();statusText('Сервер недоступен');render();
-if(settings.scriptUrl){try{initBridge(settings.scriptUrl);if(token){GoogleBridge.subscribe(state=>{if(state==='ready'&&!connected){loginAndTest('').catch(e=>{const msg=String(e.message||e);const expired=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(msg);statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');if(expired)showToast('Не удалось подтвердить сохранённый вход: '+msg)})}})}}catch(e){statusText('Некорректная ссылка Google')}}
+applyPendingWrites();statusText(settings.scriptUrl?(navigator.onLine?'Подключение к серверу…':'Сервер недоступен'):'Нужен вход секретаря');render();
+if(settings.scriptUrl){try{initBridge(settings.scriptUrl);if(token){GoogleBridge.subscribe(state=>{if(state==='ready'&&!connected){lastSessionRetry=Date.now();loginAndTest('').catch(e=>{const msg=String(e.message||e);const expired=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(msg);statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');if(expired)showToast('Не удалось подтвердить сохранённый вход: '+msg)})}})}}catch(e){statusText('Некорректная ссылка Google')}}
 setInterval(()=>{if(isConnected()&&!document.hidden)refresh()},30000);
 
 $('reminderReceiptsButton').onclick=openReminderReceipts;

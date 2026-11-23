@@ -473,3 +473,8 @@
   .sidebar .report-zone{max-height:42dvh!important}
   .sidebar #groupNav{min-height:0!important}
 }
+
+/* v44: one source of truth for server status */
+#sync.server-state.connecting{background:#e3f0ff;color:#265e9b;border-color:#bad6f6}
+.connection-status.connecting{background:#e3f0ff;color:#265e9b;border-color:#bad6f6}
+.connection-status.disconnected{background:#f7eae7;color:#994134;border-color:#e8c9c4}
