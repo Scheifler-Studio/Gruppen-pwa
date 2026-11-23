@@ -362,3 +362,24 @@
 .member-sync.done{background:#27a65b!important;animation:none!important}
 .members.values-visible .member-sync{position:relative!important;right:auto!important;top:auto!important;transform:none!important;z-index:1!important}
 .members.values-visible .more{position:relative;z-index:1}
+
+/* v42: sync indicator belongs to an existing grid cell; it never creates a new column or row. */
+.members.values-visible .member-line{grid-auto-flow:row;grid-auto-rows:52px;min-height:52px!important;height:52px!important}
+.members.values-visible .member-line>.value-note{position:relative!important;min-width:0!important;min-height:0!important;height:52px!important;display:flex;align-items:center;justify-content:center;padding-right:31px!important;overflow:hidden}
+.members.values-visible .value-note>.member-sync{position:absolute!important;top:50%!important;right:8px!important;left:auto!important;margin:0!important;transform:translateY(-50%)!important;width:19px!important;height:19px!important;min-width:19px!important;min-height:19px!important;flex:0 0 19px!important;z-index:1}
+.members.values-visible .value-note>.member-sync.pending{background:transparent!important;border:2px solid #d9e7f8!important;border-top-color:#2274d5!important;border-right-color:#2274d5!important;animation:syncRing42 .75s linear infinite!important;overflow:visible!important}
+.members.values-visible .value-note>.member-sync.pending::after{content:none!important}
+@keyframes syncRing42{to{transform:translateY(-50%) rotate(360deg)}}
+.members.values-visible .member-line>.more{position:relative!important;grid-column:8;grid-row:1;margin:0 auto!important}
+.members:not(.values-visible) .name-cell{position:relative;display:flex;align-items:center;min-width:0}
+.members:not(.values-visible) .name-cell>.member-sync{margin-left:8px!important;flex-shrink:0!important}
+.members:not(.values-visible) .name-cell>.member-sync.pending{background:transparent!important;border:2px solid #d9e7f8!important;border-top-color:#2274d5!important;border-right-color:#2274d5!important;animation:syncSimple42 .75s linear infinite!important;overflow:visible!important}
+.members:not(.values-visible) .name-cell>.member-sync.pending::after{content:none!important}
+@keyframes syncSimple42{to{transform:rotate(360deg)}}
+.members .member-sync.done{width:19px!important;height:19px!important;min-width:19px!important;min-height:19px!important}
+/* v42: preserve the group navigation on shorter iPads when the report table is expanded. */
+.sidebar{min-height:0!important;overflow:hidden}
+.sidebar #groupNav{flex:1 1 auto!important;min-height:100px!important;overflow-y:auto!important;overscroll-behavior:contain}
+.sidebar .side-spacer{display:none!important}
+.sidebar .report-zone{flex:0 1 auto!important;min-height:0!important;max-height:42dvh!important;overflow-y:auto!important;overscroll-behavior:contain}
+.sidebar .settings,.sidebar .version,.sidebar .reminders-menu{flex-shrink:0!important}
