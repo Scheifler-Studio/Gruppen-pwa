@@ -531,3 +531,26 @@
 .script-url-wrap::after{content:"";position:absolute;right:44px;top:2px;bottom:2px;width:52px;pointer-events:none;z-index:2;background:linear-gradient(to right,rgba(247,246,241,0),#f7f6f1 82%)}
 .script-url-wrap .url-eye{position:absolute;z-index:3;right:7px;top:50%;width:42px;height:42px;transform:translateY(-50%);background:#f7f6f1;color:#455b76;opacity:1;cursor:pointer;touch-action:manipulation}
 .script-url-wrap .url-eye svg{width:25px;height:25px;display:block;flex:none}
+
+/* v58: one synchronization indicator, three blue dots — no SVG rings or pseudo circles. */
+.members .member-sync.pending::before,
+.members .member-sync.pending::after{content:none!important;display:none!important;animation:none!important}
+.members .member-sync .sync-progress-icon{display:none!important}
+.members .member-sync.pending{display:flex!important;align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;width:26px!important;height:20px!important;
+  min-width:26px!important;max-width:26px!important;min-height:20px!important;max-height:20px!important;
+  flex:0 0 26px!important;padding:0!important;margin:0!important;border:0!important;
+  background:none!important;box-shadow:none!important;animation:none!important;transform:none!important;
+  overflow:visible!important;border-radius:0!important}
+.members .member-sync .sync-dots{display:none!important}
+.members .member-sync.pending .sync-dots{display:flex!important;align-items:center;justify-content:center;gap:3px;
+ width:26px;height:20px;flex:0 0 26px;box-sizing:border-box}
+.members .member-sync.pending .sync-dots i{display:block;width:5px;height:5px;min-width:5px;
+ border-radius:50%;background:#2177cf;animation:syncPulse58 1.05s ease-in-out infinite}
+.members .member-sync.pending .sync-dots i:nth-child(2){animation-delay:.17s}
+.members .member-sync.pending .sync-dots i:nth-child(3){animation-delay:.34s}
+@keyframes syncPulse58{0%,65%,100%{opacity:.32;transform:scale(.85)}30%{opacity:1;transform:scale(1.18)}}
+.members.values-visible .value-note>.member-sync.pending{position:absolute!important;top:50%!important;right:9px!important;
+ left:auto!important;transform:translateY(-50%)!important}
+.members:not(.values-visible) .name-cell>.member-sync.pending{margin-left:8px!important}
+@media(prefers-reduced-motion:reduce){.members .member-sync.pending .sync-dots i{animation:none;opacity:.75}}

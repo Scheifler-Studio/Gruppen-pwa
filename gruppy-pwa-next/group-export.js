@@ -104,19 +104,19 @@ async function allGroupsPdf(columns){
    if(current)out.push(current);return out.length?out:[''];
  };
  const maxBottom=pageH-margin-9; // Reserve the footer and a small gap.
+ const headerY=32, majorH=8, minorH=8, peopleTop=headerY+majorH+minorH;
  let chosenSize=12, chosenLines=[];
  for(let fontSize=18;fontSize>=9;fontSize-=.25){
    setFont(fontSize);
    const lines=columns.map(people=>people.map(p=>splitName(p.name)));
    const step=fontSize*25.4/72*1.18;
-   const contentMax=Math.max(0,...lines.map(group=>group.reduce((n,nameParts)=>n+nameParts.length*step+.24,0)));
-   // heading 18 mm, two colored heading bands 12 mm, content starts at y=50.
-   if(50+contentMax+1<=maxBottom){chosenSize=fontSize;chosenLines=lines;break}
+   const contentMax=Math.max(0,...lines.map(group=>group.reduce((n,nameParts)=>n+nameParts.length*step+.5,0)));
+   // Estimate content height from actual header positions.
+   if(peopleTop+contentMax+1<=maxBottom){chosenSize=fontSize;chosenLines=lines;break}
  }
  if(!chosenLines.length){setFont(chosenSize);chosenLines=columns.map(group=>group.map(p=>splitName(p.name)))}
  const step=chosenSize*25.4/72*1.18;
- const tall=Math.max(0,...chosenLines.map(group=>group.reduce((n,lines)=>n+lines.length*step+.24,0)));
- const headerY=32, majorH=6, minorH=7, peopleTop=headerY+majorH+minorH;
+ const tall=Math.max(0,...chosenLines.map(group=>group.reduce((n,lines)=>n+lines.length*step+.5,0)));
  const tableBottom=Math.min(pageH-margin-8,Math.max(peopleTop+2,peopleTop+tall+1.5));
  // Heading without underlines.
  setFont(18,true);text('Группы уборки и',pageW/2,20,'center');
@@ -126,24 +126,28 @@ async function allGroupsPdf(columns){
  ctx.fillStyle='#e5e5e5';ctx.fillRect(x0,headerY+majorH,totalW,minorH);
  line(x0,headerY,x1,headerY);line(x0,headerY+majorH,x1,headerY+majorH);
  line(x0,peopleTop,x1,peopleTop);
- setFont(14);text('Группа уборки: А',x0+colW,headerY+4.4,'center');text('Группа уборки: Б',x0+3*colW,headerY+4.4,'center');
- setFont(14,true);for(let i=0;i<4;i++)text('ГПС - '+groups[i],x0+(i+.5)*colW,headerY+majorH+5,'center');
+ ctx.textBaseline='middle';
+ setFont(14);text('Группа уборки: А',x0+colW,headerY+majorH/2,'center');text('Группа уборки: Б',x0+3*colW,headerY+majorH/2,'center');
+ // Arial uses lining numerals: A1, A2, Б1, Б2 have equal-height letters and digits.
+ setFont(14,true,sans);for(let i=0;i<4;i++)text('ГПС - '+groups[i],x0+(i+.5)*colW,headerY+majorH+minorH/2,'center');
+ ctx.textBaseline='alphabetic';
  // Individual columns; strong double vertical division between A and B.
  for(let i=0;i<=4;i++){
    const x=x0+i*colW;
    if(i===2){line(x-.35,headerY,x-.35,tableBottom,'#333',.33);line(x+.35,headerY,x+.35,tableBottom,'#333',.33)}
+   else if(i===1||i===3)line(x,headerY+majorH,x,tableBottom,'#888',.18);
    else line(x,headerY,x,tableBottom,'#888',.18);
  }
  line(x0,tableBottom,x1,tableBottom,'#888',.18);
  for(let g=0;g<4;g++){
-   let y=peopleTop+.9;
+   let y=peopleTop+.25;
    const people=columns[g]||[];
    for(let i=0;i<people.length;i++){
      const person=people[i], role=person.role;
      const rows=chosenLines[g][i];
      setFont(chosenSize,role==='leader');
-     for(const part of rows){y+=step;text(part,x0+g*colW+1,y-.3)}
-     y+=.24;
+     for(const part of rows){y+=step;text(part,x0+g*colW+1,y-.75)}
+     y+=.5;
      if(role==='leader'||role==='assistant')line(x0+g*colW+.5,y,x0+(g+1)*colW-.5,y,'#777',.2);
    }
  }
