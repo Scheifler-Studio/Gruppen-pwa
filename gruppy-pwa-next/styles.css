@@ -554,3 +554,17 @@
  left:auto!important;transform:translateY(-50%)!important}
 .members:not(.values-visible) .name-cell>.member-sync.pending{margin-left:8px!important}
 @media(prefers-reduced-motion:reduce){.members .member-sync.pending .sync-dots i{animation:none;opacity:.75}}
+
+/* v60: exactly one clock-hand indicator, fixed-size SVG, no pseudo-element rings. */
+.members .member-sync.pending::before,.members .member-sync.pending::after{content:none!important;display:none!important}
+.members .member-sync.pending{width:24px!important;min-width:24px!important;max-width:24px!important;height:24px!important;min-height:24px!important;max-height:24px!important;flex:0 0 24px!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;transform:none!important;animation:none!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:visible!important}
+.members .member-sync .sync-dots,.members .member-sync .sync-progress-icon{display:none!important}
+.members .member-sync .sync-clock{display:none!important}
+.members .member-sync.pending .sync-clock{display:block!important;width:22px!important;height:22px!important;max-width:22px!important;max-height:22px!important;flex:0 0 22px!important;overflow:visible!important}
+.members .member-sync.pending .sync-clock-hand{transform-origin:12px 12px;animation:syncClockHand60 1s linear infinite}
+@keyframes syncClockHand60{to{transform:rotate(360deg)}}
+.members.values-visible .value-note>.member-sync.pending{position:absolute!important;top:50%!important;right:11px!important;transform:translateY(-50%)!important}
+@media(prefers-reduced-motion:reduce){.members .member-sync.pending .sync-clock-hand{animation-duration:3s!important}}
+
+/* v60 stopwatch: a single dial with one rotating second hand, no duplicated progress rings */
+.members .member-sync.pending .sync-clock-hand{transform-origin:12px 14px;transform-box:view-box;animation:syncClockHand60 1.2s linear infinite}
