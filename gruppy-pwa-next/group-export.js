@@ -80,11 +80,11 @@ async function allGroupsPdf(columns){
  if(!ctx)throw new Error('Не удалось создать PDF на устройстве');
  ctx.scale(mm,mm);
  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,pageW,pageH);
- const serif='Georgia,"Times New Roman",serif';
+ const serif='"Times New Roman",Times,serif';
  const sans='Arial,-apple-system,sans-serif';
  const setFont=(pt,bold=false,family=serif)=>{ctx.font=(bold?'bold ':'')+(pt*25.4/72).toFixed(3)+'px '+family};
  const line=(x1,y1,x2,y2,color='#969696',width=.18)=>{ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=width;ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
- const text=(v,x,y,align='left',color='#151515')=>{ctx.fillStyle=color;ctx.textBaseline='alphabetic';ctx.textAlign=align;ctx.fillText(String(v??''),x,y)};
+ const text=(v,x,y,align='left',color='#151515',baseline='alphabetic')=>{ctx.fillStyle=color;ctx.textBaseline=baseline;ctx.textAlign=align;ctx.fillText(String(v??''),x,y)};
  const x0=margin, x1=pageW-margin, totalW=x1-x0, colW=totalW/4;
  const groups=['А1','А2','Б1','Б2'];
  // Decide a single size for all four columns by measuring the longest column.
@@ -126,11 +126,13 @@ async function allGroupsPdf(columns){
  ctx.fillStyle='#e5e5e5';ctx.fillRect(x0,headerY+majorH,totalW,minorH);
  line(x0,headerY,x1,headerY);line(x0,headerY+majorH,x1,headerY+majorH);
  line(x0,peopleTop,x1,peopleTop);
- ctx.textBaseline='middle';
- setFont(14);text('Группа уборки: А',x0+colW,headerY+majorH/2,'center');text('Группа уборки: Б',x0+3*colW,headerY+majorH/2,'center');
- // Arial uses lining numerals: A1, A2, Б1, Б2 have equal-height letters and digits.
- setFont(14,true,sans);for(let i=0;i<4;i++)text('ГПС - '+groups[i],x0+(i+.5)*colW,headerY+majorH+minorH/2,'center');
- ctx.textBaseline='alphabetic';
+ // Explicit middle baseline: the shared text helper otherwise resets it to alphabetic.
+ // Use Times New Roman in both title rows, matching the rest of the printed document.
+ setFont(14,false,serif);
+ text('Группа уборки: А',x0+colW,headerY+majorH/2,'center','#151515','middle');
+ text('Группа уборки: Б',x0+3*colW,headerY+majorH/2,'center','#151515','middle');
+ setFont(14,true,serif);
+ for(let i=0;i<4;i++)text('ГПС - '+groups[i],x0+(i+.5)*colW,headerY+majorH+minorH/2,'center','#151515','middle');
  // Individual columns; strong double vertical division between A and B.
  for(let i=0;i<=4;i++){
    const x=x0+i*colW;
