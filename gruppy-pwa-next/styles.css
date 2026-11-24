@@ -568,3 +568,25 @@
 
 /* v60 stopwatch: a single dial with one rotating second hand, no duplicated progress rings */
 .members .member-sync.pending .sync-clock-hand{transform-origin:12px 14px;transform-box:view-box;animation:syncClockHand60 1.2s linear infinite}
+
+
+/* v61: clean three-dot transfer indicator: no container surface, borders, shadows or nested spinner. */
+.members .member-sync.pending,
+.members:not(.values-visible) .name-cell>.member-sync.pending,
+.members.values-visible .value-note>.member-sync.pending {
+  box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  width:27px!important;min-width:27px!important;max-width:27px!important;
+  height:22px!important;min-height:22px!important;max-height:22px!important;flex:0 0 27px!important;
+  padding:0!important;margin:0 0 0 8px!important;border:0!important;border-radius:0!important;
+  background:transparent!important;background-image:none!important;box-shadow:none!important;outline:none!important;
+  filter:none!important;backdrop-filter:none!important;animation:none!important;transform:none!important;overflow:visible!important;
+}
+.members .member-sync.pending::before,.members .member-sync.pending::after{content:none!important;display:none!important}
+.members .member-sync.pending .sync-clock,.members .member-sync.pending .sync-progress-icon{display:none!important}
+.members .member-sync.pending .sync-dots{display:flex!important;width:27px!important;height:22px!important;align-items:center!important;justify-content:center!important;gap:4px!important;background:none!important;box-shadow:none!important;border:0!important}
+.members .member-sync.pending .sync-dots i{display:block!important;flex:0 0 5px!important;width:5px!important;height:5px!important;min-width:5px!important;min-height:5px!important;max-width:5px!important;max-height:5px!important;border-radius:50%!important;background:#237cdb!important;box-shadow:none!important;border:0!important;opacity:.35;animation:syncDots61 1.15s ease-in-out infinite!important}
+.members .member-sync.pending .sync-dots i:nth-child(2){animation-delay:.18s!important}
+.members .member-sync.pending .sync-dots i:nth-child(3){animation-delay:.36s!important}
+@keyframes syncDots61{0%,65%,100%{opacity:.3;transform:scale(.85)}32%{opacity:1;transform:scale(1.18)}}
+.members.values-visible .value-note>.member-sync.pending{position:absolute!important;top:50%!important;right:10px!important;left:auto!important;margin:0!important;transform:translateY(-50%)!important}
+@media(prefers-reduced-motion:reduce){.members .member-sync.pending .sync-dots i{animation:none!important;opacity:.8!important}}
