@@ -192,9 +192,10 @@ function statusText(t){
   settingsStatus.classList.toggle('disconnected',!success&&!connecting);
  }
  const form=$('settingsForm');
+ if($('recoverAccess'))$('recoverAccess').hidden=serverUiState!=='auth';
  if(form&&form.elements.scriptUrl){
   let same=false;try{same=GoogleBridge.normalizeUrl(form.elements.scriptUrl.value)===settings.scriptUrl}catch(e){}
-  const disable=success&&same&&!form.elements.password.value.trim();
+  const disable=success&&same;
   if($('testGoogle'))$('testGoogle').disabled=disable;
   if($('connectGoogle'))$('connectGoogle').disabled=disable;
  }
@@ -224,11 +225,16 @@ async function refresh(){
  }catch(e){const expired=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(String(e.message||e));connected=false;statusText(expired?'Нужен вход секретаря':'Сервер временно недоступен');showToast(e.message);render()}
 }
 async function loginAndTest(password){
- if(!password){if(!token)throw Error('Введи пароль секретаря');}
+ if(!password){if(!token)throw Error('Сохранённая авторизация отсутствует. Требуется однократное восстановление доступа.');}
  else {const r=await GoogleBridge.call('login',{password});token=r.token;localStorage.setItem(sessionKey,token);sessionStorage.setItem(sessionKey,token)}
  const test=await GoogleBridge.call('test',{},token);
  if(!test?.ok)throw Error('Не удалось подтвердить запись в Google Drive');
  connected=true;await refresh();if(writeQueue.length)retryWritesSoon(250);return test;
+}
+function requestAccessRecovery(){
+ openModal('Восстановление доступа',`<p class="hint">Сервер не принял сохранённую авторизацию. Для безопасного восстановления нужен один раз пароль секретаря. Обновление программы и смена сети сами по себе его не требуют.</p><form id="recoverAccessForm"><label class="field">Код доступа<input name="access" type="password" autocomplete="off" required></label><div class="actions"><button type="button" id="recoverCancel" class="secondary">Отмена</button><button class="primary" type="submit">Восстановить</button></div></form>`);
+ $('recoverCancel').onclick=closeModal;
+ $('recoverAccessForm').onsubmit=async event=>{event.preventDefault();const password=event.currentTarget.elements.access.value;closeModal();showConnectionProgress();try{await loginAndTest(password);finishConnectionProgress(null)}catch(error){statusText('Нужен вход секретаря');finishConnectionProgress(error)}};
 }
 function initBridge(url){GoogleBridge.connect(url);connected=false;statusText('Подключение к Google…')}
 const GROUP_COLORS=[
@@ -308,9 +314,9 @@ function showSettings(){
  openModal('Настройки',`<form id="settingsForm">
  <h3>Google Drive</h3>
  <p class="hint">Сначала подключи Google Drive. Без подтверждённой связи создание участников и групп заблокировано. Ссылка — опубликованный адрес Google Apps Script, оканчивающийся на /exec.</p>
- <label class="field">Адрес Google Apps Script<input name="scriptUrl" type="url" autocomplete="off" value="${esc(settings.scriptUrl||'')}" placeholder="https://script.google.com/macros/s/…/exec" required></label>
- <label class="field">Пароль<input name="password" type="password" autocomplete="off" placeholder="Пароль из ADMIN_PASSWORD"></label>
+ <label class="field">Адрес Google Apps Script<div class="script-url-wrap"><input name="scriptUrl" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(settings.scriptUrl||'')}" placeholder="Адрес подключения" required><button id="revealScriptUrl" class="url-eye" type="button" aria-label="Показать адрес на три секунды" title="Показать на три секунды"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
  <div id="googleStatus" class="connection-status" role="status"></div>
+ <button id="recoverAccess" class="secondary" type="button" ${token?'hidden':''}>Восстановить доступ</button>
  <div class="actions"><button class="secondary" type="button" id="testGoogle">Проверить подключение</button><button class="primary" type="submit" id="connectGoogle">Подключить Google Drive</button></div></form>
  <hr><section class="app-update-section" aria-label="Обновление программы"><h3>Обновление программы</h3>
  <p class="hint app-version-state" id="appUpdateStatus" role="status" aria-live="polite">Проверяем наличие обновления…</p>
@@ -369,18 +375,25 @@ function showSettings(){
  };
  readAvailableVersion();
  const form=$('settingsForm');
- function updateConnectionButtons(){const active=isConnected()&&GoogleBridge.normalizeUrl(form.elements.scriptUrl.value)===settings.scriptUrl&&!form.elements.password.value.trim();$('testGoogle').disabled=active;$('connectGoogle').disabled=active;}
+ $('recoverAccess').onclick=requestAccessRecovery;
+ function updateConnectionButtons(){let same=false;try{same=GoogleBridge.normalizeUrl(form.elements.scriptUrl.value)===settings.scriptUrl}catch(e){}const active=isConnected()&&same;$('testGoogle').disabled=active;$('connectGoogle').disabled=active;}
  form.elements.scriptUrl.addEventListener('input',updateConnectionButtons);
- form.elements.password.addEventListener('input',updateConnectionButtons);
+ // The server URL remains masked; pressing the eye reveals it for three seconds only.
+ let urlRevealTimer=null;
+ $('revealScriptUrl').onclick=()=>{
+  const input=form.elements.scriptUrl;input.type='text';
+  clearTimeout(urlRevealTimer);
+  urlRevealTimer=setTimeout(()=>{if(input.isConnected)input.type='password'},3000);
+ };
  updateConnectionButtons();
  statusText(serverUiState==='connected'?'Сервер подключён':serverUiState==='auth'?'Нужен вход секретаря':serverUiState==='connecting'?'Подключение к серверу…':'Сервер недоступен');
  async function submitSettings(runLogin){
   const url=GoogleBridge.normalizeUrl(form.elements.scriptUrl.value);
   const changed=url!==settings.scriptUrl;
-  if(changed){settings.scriptUrl=url;saveSettings();token='';sessionStorage.removeItem(sessionKey);localStorage.removeItem(sessionKey);initBridge(url)}
+  if(changed){settings.scriptUrl=url;saveSettings();initBridge(url)}
   else if(!GoogleBridge.ready)initBridge(url);
   statusText('Подключение к серверу…');
-  const submittedPassword=runLogin?form.elements.password.value:'';
+  const submittedPassword=''; // Use the saved secretary session; never request a password during routine updates.
   if(runLogin){$('connectGoogle').disabled=true;showConnectionProgress();closeModal()}
   try{
    if(runLogin) {
@@ -391,7 +404,7 @@ function showSettings(){
      if(!token)statusText('Нужен вход секретаря');
      if(token){const test=await loginAndTest('');statusText('Сервер подключён')}
    }
-  }catch(e){connected=false;statusText(/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря/i.test(String(e.message||e))?'Нужен вход секретаря':'Сервер недоступен');if(runLogin)finishConnectionProgress(e);else showToast(e.message)}
+  }catch(e){connected=false;const auth=/Сессия секретаря закончилась|Неверный пароль секретаря|Авторизация секретаря|Сохранённая авторизация отсутствует/i.test(String(e.message||e));statusText(auth?'Нужен вход секретаря':'Сервер недоступен');if(runLogin)finishConnectionProgress(e);else showToast(e.message)}
   finally{const b=$('connectGoogle');if(b)b.disabled=false}
  }
  form.onsubmit=e=>{e.preventDefault();submitSettings(true)};
@@ -545,7 +558,7 @@ async function retrySavedSession(){
 }
 setInterval(()=>{if(!document.hidden)retrySavedSession()},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)retrySavedSession()});
-const APP_VERSION=50;
+const APP_VERSION=51;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){

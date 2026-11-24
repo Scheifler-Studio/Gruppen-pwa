@@ -516,3 +516,10 @@
 .members.values-visible .value-note>.member-sync.pending{top:50%!important;right:10px!important;left:auto!important;transform:translateY(-50%)!important}
 
 /* v49: A4 roster export styles are fully isolated in the print window. */
+
+/* v51 – masked server address: eye control must not change the secret or registration. */
+.script-url-wrap{display:flex;align-items:center;position:relative;width:100%;margin-top:7px}
+.field .script-url-wrap input{margin-top:0;padding-right:50px;min-width:0}
+.url-eye{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:transparent;width:40px;height:40px;display:grid;place-items:center;color:#516579;border-radius:8px}
+.url-eye svg{width:24px;height:24px}
+.url-eye:focus-visible{outline:2px solid #347ad2}
