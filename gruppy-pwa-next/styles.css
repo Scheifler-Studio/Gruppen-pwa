@@ -590,3 +590,8 @@
 @keyframes syncDots61{0%,65%,100%{opacity:.3;transform:scale(.85)}32%{opacity:1;transform:scale(1.18)}}
 .members.values-visible .value-note>.member-sync.pending{position:absolute!important;top:50%!important;right:10px!important;left:auto!important;margin:0!important;transform:translateY(-50%)!important}
 @media(prefers-reduced-motion:reduce){.members .member-sync.pending .sync-dots i{animation:none!important;opacity:.8!important}}
+
+/* v62 — group settings */
+.group-export-button svg{width:27px;height:27px;stroke-width:1.7}
+.group-manage-actions{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.group-manage-actions .danger-button{margin-right:auto}

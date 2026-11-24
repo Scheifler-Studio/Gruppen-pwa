@@ -209,7 +209,7 @@ function checkConnection(){if(!isConnected()&&!groups.length){showToast('Для 
 function callGoogle(action,payload){return GoogleBridge.call(action,payload,token)}
 async function post(path,obj){
  if(!isConnected())throw Error('Google Drive не подключён. Открой настройки.');
- const map={'/api/admin/group':'group','/api/admin/member':'member','/api/admin/import':'import','/api/admin/pending/decision':'decision','/api/admin/archive':'archiveMember','/api/admin/report':'adminReport'};
+ const map={'/api/admin/group/rename':'renameGroup','/api/admin/group/delete':'deleteGroup','/api/admin/group':'group','/api/admin/member':'member','/api/admin/import':'import','/api/admin/pending/decision':'decision','/api/admin/archive':'archiveMember','/api/admin/report':'adminReport'};
  const action=map[path];if(!action)throw Error('Неизвестная операция');
  const r=await callGoogle(action,obj);
  if(r&&r.conflict){const err=new Error('Должность занята');err.status=409;err.data=r;throw err}
@@ -270,7 +270,7 @@ function renderGroupFilter(){
  button.textContent=active.length?`Группы: ${active.map(id=>groupName(id)).join(', ')}`:'Все группы';
  options.innerHTML='<label class="group-filter-choice"><input type="checkbox" data-filter-all '+(!active.length?'checked':'')+'> Все группы</label>'+groups.map(g=>`<label class="group-filter-choice"><input type="checkbox" data-filter-id="${esc(g.id)}" ${active.includes(String(g.id))?'checked':''}> <span class="filter-color-dot" style="background:${groupColor(g.id)}"></span> ${esc(g.name)}</label>`).join('');
 }
-function render(){const visible=members.filter(m=>!m.hidden);$('groupNav').innerHTML='<button data-group="all" class="'+(selected==='all'?'active':'')+'">Все участники <b>'+visible.length+'</b></button>'+groups.map(g=>`<button data-group="${esc(g.id)}" class="${selected===g.id?'active':''}"><span class="nav-group-label">Группа <strong>${esc(g.name)}</strong></span><b>${visible.filter(m=>m.groupId===g.id).length}</b></button>`).join('');renderGroupFilter();$('title').textContent=selected==='none'?'Выберите группу':selected==='all'?'Участники':'Группа '+groupName(selected);$('groupExportButton').hidden=selected==='none';$('groupExportButton').title=selected==='all'?'Экспорт всех групп в PDF':'Экспорт группы';$('groupExportButton').setAttribute('aria-label',$('groupExportButton').title);const term=$('search').value.trim().toLocaleLowerCase(),col=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});const reportByMember=new Map(reports.map(r=>[String(r.memberId),r]));const found=visible.filter(m=>selected!=='none'&&(selected==='all'||selected===m.groupId)&&passesGroupFilter(m)&&[m.firstName,m.lastName,groupName(m.groupId)].join(' ').toLocaleLowerCase().includes(term)&&(!order.startsWith('service:')||(order==='service:HPV'?reportCategory(m.category)==='HPV':m.category===order.slice(8)))&&(order!=='no_report'||!reportByMember.has(String(m.id)))&&(!order.startsWith('answer_')||reportByMember.get(String(m.id))?.answer===(order==='answer_yes'?'yes':'no')));
+function render(){const visible=members.filter(m=>!m.hidden);$('groupNav').innerHTML='<button data-group="all" class="'+(selected==='all'?'active':'')+'">Все участники <b>'+visible.length+'</b></button>'+groups.map(g=>`<button data-group="${esc(g.id)}" class="${selected===g.id?'active':''}"><span class="nav-group-label">Группа <strong>${esc(g.name)}</strong></span><b>${visible.filter(m=>m.groupId===g.id).length}</b></button>`).join('');renderGroupFilter();$('title').textContent=selected==='none'?'Выберите группу':selected==='all'?'Участники':'Группа '+groupName(selected);$('groupExportButton').hidden=selected==='none';$('groupExportButton').title=selected==='all'?'Экспорт всех групп в PDF':'Настройки группы';$('groupExportButton').setAttribute('aria-label',$('groupExportButton').title);const term=$('search').value.trim().toLocaleLowerCase(),col=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});const reportByMember=new Map(reports.map(r=>[String(r.memberId),r]));const found=visible.filter(m=>selected!=='none'&&(selected==='all'||selected===m.groupId)&&passesGroupFilter(m)&&[m.firstName,m.lastName,groupName(m.groupId)].join(' ').toLocaleLowerCase().includes(term)&&(!order.startsWith('service:')||(order==='service:HPV'?reportCategory(m.category)==='HPV':m.category===order.slice(8)))&&(order!=='no_report'||!reportByMember.has(String(m.id)))&&(!order.startsWith('answer_')||reportByMember.get(String(m.id))?.answer===(order==='answer_yes'?'yes':'no')));
  const alpha=(a,b)=>col.compare(a.lastName,b.lastName)||col.compare(a.firstName,b.firstName);
  found.sort((a,b)=>{if(selected==='all'&&!['hours_desc','hours_asc','studies_desc','studies_asc'].includes(order)){const byGroup=new Intl.Collator(['ru','de','en'],{numeric:true,sensitivity:'base'}).compare(groupName(a.groupId),groupName(b.groupId));if(byGroup)return byGroup;}if(order==='za')return -alpha(a,b);if(order==='hours_desc'||order==='hours_asc'||order==='studies_desc'||order==='studies_asc'){const field=order.startsWith('hours')?'hours':'studies', sign=order.endsWith('desc')?-1:1;const av=Number(reportByMember.get(String(a.id))?.[field])||0,bv=Number(reportByMember.get(String(b.id))?.[field])||0;return sign*(av-bv)||alpha(a,b)}if(order==='added_desc')return String(b.addedAt||'').localeCompare(String(a.addedAt||''))||alpha(a,b);if(order==='added_asc')return String(a.addedAt||'').localeCompare(String(b.addedAt||''))||alpha(a,b);return alpha(a,b)});
  $('count').textContent=selected==='none'?'Группа не выбрана':`${selected==='all'?'Все группы':'Группа '+groupName(selected)} · ${found.length}`;const list=$('list'),toggle=$('toggleValues');toggle.textContent=showValues?'Скрыть все значения':'Показать все значения';toggle.setAttribute('aria-pressed',String(showValues));list.classList.toggle('values-visible',showValues);
@@ -471,13 +471,36 @@ function showAllGroupsExport(){
   closeModal();
  }catch(err){showToast('Ошибка экспорта PDF: '+err.message)}};
 }
+function showGroupManagement(groupId){
+ const g=groups.find(x=>String(x.id)===String(groupId));
+ if(!g){showToast('Группа не найдена');return}
+ const count=members.filter(m=>String(m.groupId)===String(groupId)&&!m.hidden).length;
+ openModal('Редактировать группу '+g.name,`<form id="manageGroupForm"><label class="field">Название группы<input name="name" maxlength="100" required value="${esc(g.name)}"></label><p class="hint">Участников: ${count}. При переименовании сохраняются участники, отчёты и назначения.</p><div class="actions group-manage-actions"><button id="deleteGroup" type="button" class="danger-button">Удалить группу</button><button id="groupEditCancel" type="button" class="secondary">Закрыть</button><button class="primary" type="submit">Сохранить название</button></div></form>`);
+ $('groupEditCancel').onclick=()=>showGroupExport();
+ $('manageGroupForm').onsubmit=async e=>{
+  e.preventDefault();const name=e.currentTarget.elements.name.value.trim();
+  if(!name||name===g.name){if(name===g.name)showGroupExport();return}
+  if(groups.some(x=>String(x.id)!==String(groupId)&&x.name.toLocaleLowerCase()===name.toLocaleLowerCase())){showToast('Группа с таким названием уже существует');return}
+  const btn=e.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
+  try{await post('/api/admin/group/rename',{groupId,name});g.name=name;cacheVisibleSnapshot();closeModal();render();showToast('Название группы сохранено');refresh()}
+  catch(err){btn.disabled=false;showToast('Не удалось переименовать: '+String(err.message||err).slice(0,110))}
+ };
+ $('deleteGroup').onclick=async()=>{
+  if(members.some(m=>String(m.groupId)===String(groupId)&&!m.hidden)){showToast('Сначала переведи участников в другие группы');return}
+  if(!confirm(`Удалить группу «${g.name}»? Операция доступна только для полностью пустых групп.`))return;
+  const btn=$('deleteGroup');btn.disabled=true;
+  try{await post('/api/admin/group/delete',{groupId});groups=groups.filter(x=>String(x.id)!==String(groupId));if(String(selected)===String(groupId))selected='none';if(settings.groupColors)delete settings.groupColors[String(groupId)];settings.groupFilterIds=(settings.groupFilterIds||[]).filter(x=>String(x)!==String(groupId));saveSettings();cacheVisibleSnapshot();closeModal();render();showToast('Пустая группа удалена');refresh()}
+  catch(err){btn.disabled=false;showToast('Не удалось удалить: '+String(err.message||err).slice(0,110))}
+ };
+}
 function showGroupExport(){
  if(selected==='all'){showAllGroupsExport();return;}
  if(selected==='none')return;
  const groupId=selected;
  const name=groupName(groupId);
- openModal('Экспорт — Группа '+name,`<div class="group-export-dialog"><p>Список участников группы в текущем порядке сортировки. Ответственный за группу будет первым, помощник — вторым.</p><div class="export-options"><button id="exportExcel" type="button" class="export-option"><strong>Excel (.xlsx)</strong><small>Скачать таблицу</small></button><button id="exportPdf" type="button" class="export-option"><strong>PDF · A4</strong><small>Готовый PDF без печати, A4 горизонтально</small></button></div><div class="actions"><button id="exportClose" type="button" class="secondary">Закрыть</button></div></div>`);
+ openModal('Настройки группы '+name,`<div class="group-export-dialog"><p>Скачать список участников или изменить настройки группы.</p><div class="export-options"><button id="exportExcel" type="button" class="export-option"><strong>Excel (.xlsx)</strong><small>Скачать таблицу</small></button><button id="exportPdf" type="button" class="export-option"><strong>PDF · A4</strong><small>Скачать PDF группы</small></button></div><div class="actions group-manage-actions"><button id="editGroup" type="button" class="secondary">Редактировать группу</button><button id="exportClose" type="button" class="secondary">Закрыть</button></div></div>`);
  $('exportClose').onclick=closeModal;
+ $('editGroup').onclick=()=>showGroupManagement(groupId);
  const items=members.filter(m=>!m.hidden&&m.groupId===groupId);
  const collator=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});
  const alpha=(a,b)=>collator.compare(a.lastName||'',b.lastName||'')||collator.compare(a.firstName||'',b.firstName||'');
