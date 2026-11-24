@@ -545,7 +545,7 @@ async function retrySavedSession(){
 }
 setInterval(()=>{if(!document.hidden)retrySavedSession()},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)retrySavedSession()});
-const APP_VERSION=49;
+const APP_VERSION=50;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){

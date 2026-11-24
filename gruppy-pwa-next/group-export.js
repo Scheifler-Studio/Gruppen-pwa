@@ -95,14 +95,13 @@ function allGroupsPdf(columns){
  thead .major b{color:#a21820}
  thead .minor th{background:#e5e5e5;font-size:12pt;padding:2mm .5mm}
  th.split,td.split{border-left:2.3pt double #252525!important}
- td.people-col{height:143mm;padding:1.3mm 1mm;vertical-align:top;border-left:.45pt solid #a3a3a3;border-right:.45pt solid #a3a3a3;border-top:0;border-bottom:0}
- .person{font-size:9.4pt;line-height:1.15;margin:0 0 1.2mm;overflow-wrap:break-word;word-break:normal}
+ td.people-col{padding:1.1mm 1mm .8mm;vertical-align:top;border-left:.45pt solid #a3a3a3;border-right:.45pt solid #a3a3a3;border-top:0;border-bottom:0}
+ .person{font-size:11pt;line-height:1.14;margin:0 0 .65mm;overflow-wrap:break-word;word-break:normal}
  .person.leader{font-weight:700}
  .person.assistant{font-style:italic;font-weight:600}
- body.dense .person{font-size:8.5pt;line-height:1.12;margin-bottom:.8mm}
- body.compact .person{font-size:7.3pt;line-height:1.08;margin-bottom:.4mm}
- body.compact td.people-col{height:143mm}
- .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;margin-top:4mm;min-height:5.2mm;padding:0 .5mm;font:9.5pt Arial,sans-serif}
+ body.dense .person{font-size:10.2pt;line-height:1.12;margin-bottom:.55mm}
+ body.compact .person{font-size:8.9pt;line-height:1.1;margin-bottom:.4mm}
+ .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;margin-top:2.5mm;min-height:5.2mm;padding:0 .5mm;font:9.5pt Arial,sans-serif}
  .footer strong{font-weight:700}
  .footer-date{font-style:italic}
  .print-ui{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;font:14px -apple-system,BlinkMacSystemFont,Arial,sans-serif}
