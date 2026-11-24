@@ -506,3 +506,13 @@
  font-size:16px;z-index:1;
 }
 .table-month-picker:focus-within{outline:2px solid #2d76c4;outline-offset:-2px;border-radius:5px}
+
+/* v48: exactly one geometrically circular spinner per member, drawn as a single SVG. */
+.members .member-sync.pending::before,.members .member-sync.pending::after{content:none!important;display:none!important;animation:none!important}
+.members .member-sync.pending{display:flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;transform:none!important;animation:none!important;width:20px!important;height:20px!important;min-width:20px!important;min-height:20px!important;max-width:20px!important;max-height:20px!important;border:0!important;background:none!important;border-radius:50%!important;overflow:visible!important}
+.members .member-sync .sync-progress-icon{display:none!important}
+.members .member-sync.pending .sync-progress-icon{display:block!important;flex:0 0 18px!important;width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;animation:syncSvg48 .8s linear infinite!important;transform-origin:50% 50%!important}
+@keyframes syncSvg48{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.members.values-visible .value-note>.member-sync.pending{top:50%!important;right:10px!important;left:auto!important;transform:translateY(-50%)!important}
+
+/* v49: A4 roster export styles are fully isolated in the print window. */

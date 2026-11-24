@@ -69,5 +69,55 @@ function pdf(group,rows){
  w.document.open();w.document.write(doc);w.document.close();w.focus();return true;
 }
 
-window.GruppenGroupExport={excel,pdf};
+function allGroupsPdf(columns){
+ const w=window.open('','_blank');if(!w)return false;
+ // Preserve popup return behavior and avoid touching the user's stored app state.
+ const returnUrl=window.location.href;
+ const groups=['А1','А2','Б1','Б2'];
+ const maxCount=Math.max(0,...columns.map(group=>group.length));
+ const density=maxCount>30?'compact':maxCount>24?'dense':'normal';
+ const cells=columns.map((people,i)=>`<td class="people-col ${i===2?'split':''}">${people.map(person=>{
+  const role=person.role==='leader'?'leader':person.role==='assistant'?'assistant':'';
+  return `<div class="person ${role}">${htmlEsc(person.name)}</div>`;
+ }).join('')}</td>`).join('');
+ const dateStr=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Berlin'});
+ const doc=`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Группы уборки и проповеднического служения</title>
+ <style>
+ @page{size:A4 landscape;margin:10mm}
+ *{box-sizing:border-box}
+ html,body{margin:0;padding:0;color:#111;background:#fff;font-family:"Times New Roman",Georgia,serif}
+ .paper{width:100%;margin:0 auto}
+ .heading{height:20mm;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;font-weight:700;font-size:15pt;line-height:1.12}
+ .heading .second{text-decoration:underline}
+ table{width:100%;border-collapse:collapse;table-layout:fixed;border:0.45pt solid #969696}
+ th{padding:1.2mm 1mm;text-align:center;font-weight:700;border:0.45pt solid #999}
+ thead .major th{background:#e6eafa;font-weight:normal;font-size:12pt;padding:1.1mm 0}
+ thead .major b{color:#a21820}
+ thead .minor th{background:#e5e5e5;font-size:12pt;padding:2mm .5mm}
+ th.split,td.split{border-left:2.3pt double #252525!important}
+ td.people-col{height:143mm;padding:1.3mm 1mm;vertical-align:top;border-left:.45pt solid #a3a3a3;border-right:.45pt solid #a3a3a3;border-top:0;border-bottom:0}
+ .person{font-size:9.4pt;line-height:1.15;margin:0 0 1.2mm;overflow-wrap:break-word;word-break:normal}
+ .person.leader{font-weight:700}
+ .person.assistant{font-style:italic;font-weight:600}
+ body.dense .person{font-size:8.5pt;line-height:1.12;margin-bottom:.8mm}
+ body.compact .person{font-size:7.3pt;line-height:1.08;margin-bottom:.4mm}
+ body.compact td.people-col{height:143mm}
+ .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;margin-top:4mm;min-height:5.2mm;padding:0 .5mm;font:9.5pt Arial,sans-serif}
+ .footer strong{font-weight:700}
+ .footer-date{font-style:italic}
+ .print-ui{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;font:14px -apple-system,BlinkMacSystemFont,Arial,sans-serif}
+ .print-ui button,.print-ui a{border:0;min-height:44px;padding:11px 16px;border-radius:10px;font-weight:600;cursor:pointer;text-decoration:none;background:#e6edf6;color:#1b3d5c}
+ .print-ui .print{background:#2673cc;color:#fff}
+ @media screen{body{padding:12px 8px}.paper{max-width:277mm}.print-ui{position:sticky;top:0;background:#fff;padding:7px;z-index:5}}
+ @media print{html,body{width:277mm!important;margin:0!important;padding:0!important} .print-ui{display:none!important}.paper{width:277mm!important;max-width:277mm!important;break-inside:avoid;page-break-inside:avoid} table,tr,td,th{break-inside:avoid;page-break-inside:avoid} thead .major th,thead .minor th{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important} .footer{break-inside:avoid}}
+ </style></head><body class="${density}"><div class="print-ui"><button class="print" type="button" onclick="window.print()">Печать / Сохранить PDF</button><button id="returnButton" type="button">Закрыть и вернуться</button><a id="fallbackReturn" href="${htmlEsc(returnUrl)}" style="display:none">Вернуться в программу</a></div>
+ <div class="paper"><div class="heading"><div>Группы уборки и</div><div class="second">проповеднического служения</div></div>
+ <table><thead><tr class="major"><th colspan="2">Группа уборки: <b>А</b></th><th class="split" colspan="2">Группа уборки: <b>Б</b></th></tr><tr class="minor">${groups.map((g,i)=>`<th class="${i===2?'split':''}">ГПС - ${g}</th>`).join('')}</tr></thead><tbody><tr>${cells}</tr></tbody></table>
+ <div class="footer"><span>Versammlung «<strong>Norderstedt russisch</strong>» (33779)</span><span class="footer-date">${dateStr}</span></div></div>
+ <script>document.getElementById('returnButton').addEventListener('click',function(){window.close();setTimeout(function(){window.location.href=document.getElementById('fallbackReturn').href},200)});<\/script>
+ </body></html>`;
+ w.document.open();w.document.write(doc);w.document.close();w.focus();return true;
+}
+
+window.GruppenGroupExport={excel,pdf,allGroupsPdf};
 })();
