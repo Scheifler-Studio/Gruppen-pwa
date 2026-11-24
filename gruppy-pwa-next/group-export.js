@@ -75,7 +75,8 @@ function allGroupsPdf(columns){
  const returnUrl=window.location.href;
  const groups=['А1','А2','Б1','Б2'];
  const maxCount=Math.max(0,...columns.map(group=>group.length));
- const density=maxCount>30?'compact':maxCount>24?'dense':'normal';
+ // The longest column determines one shared font size across all four columns.
+ const density='normal';
  const cells=columns.map((people,i)=>`<td class="people-col ${i===2?'split':''}">${people.map(person=>{
   const role=person.role==='leader'?'leader':person.role==='assistant'?'assistant':'';
   return `<div class="person ${role}">${htmlEsc(person.name)}</div>`;
@@ -83,39 +84,54 @@ function allGroupsPdf(columns){
  const dateStr=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Berlin'});
  const doc=`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Группы уборки и проповеднического служения</title>
  <style>
- @page{size:A4 landscape;margin:10mm}
+ @page{size:A4 landscape;margin:15mm}
  *{box-sizing:border-box}
  html,body{margin:0;padding:0;color:#111;background:#fff;font-family:"Times New Roman",Georgia,serif}
- .paper{width:100%;margin:0 auto}
- .heading{height:22mm;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;font-weight:700;font-size:17pt;line-height:1.12}
+ .paper{width:267mm;margin:0 auto}
+ .heading{height:19mm;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;font-weight:700;font-size:18pt;line-height:1.12}
  .heading .second{text-decoration:none}
- table{width:92%;margin-left:auto;margin-right:auto;border-collapse:collapse;table-layout:fixed;border:0.45pt solid #969696}
+ table{width:100%;margin-left:auto;margin-right:auto;border-collapse:collapse;table-layout:fixed;border:0.45pt solid #969696}
  th{padding:1.2mm 1mm;text-align:center;font-weight:700;border:0.45pt solid #999}
- thead .major th{background:#e6eafa;font-weight:normal;font-size:14pt;padding:1.1mm 0}
+ thead .major th{background:#e6eafa;font-weight:normal;font-size:15pt;padding:1.1mm 0}
  thead .major b{color:#a21820}
- thead .minor th{background:#e5e5e5;font-size:14pt;padding:2mm .5mm}
+ thead .minor th{background:#e5e5e5;font-size:15pt;padding:2mm .5mm}
  th.split,td.split{border-left:2.3pt double #252525!important}
  td.people-col{padding:1.1mm 1mm .8mm;vertical-align:top;border-left:.45pt solid #a3a3a3;border-right:.45pt solid #a3a3a3;border-top:0;border-bottom:0}
- .person{font-size:13pt;line-height:1.16;margin:0 0 .55mm;overflow-wrap:break-word;word-break:normal}
+ .person{font-size:var(--roster-font,16pt);line-height:1.09;margin:0 0 .3mm;overflow-wrap:break-word;word-break:normal}
  .person.leader{font-weight:700}
  .person.assistant{font-style:normal;font-weight:400}
  /* Divider lines only after the leader and the assistant, across the whole group column. */
  .person.leader,.person.assistant{border-bottom:.65pt solid #555;padding-bottom:.5mm;margin-bottom:.6mm}
- body.dense .person{font-size:12pt;line-height:1.12;margin-bottom:.55mm}
- body.compact .person{font-size:10.4pt;line-height:1.1;margin-bottom:.4mm}
- .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;margin-top:2.5mm;min-height:5.2mm;padding:0 .5mm;font:11pt Arial,sans-serif}
+ .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;width:100%;margin:2mm auto 0;min-height:5.2mm;padding:0 .5mm;font:11.8pt Arial,sans-serif}
  .footer strong{font-weight:700}
  .footer-date{font-style:italic}
  .print-ui{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;font:14px -apple-system,BlinkMacSystemFont,Arial,sans-serif}
  .print-ui button,.print-ui a{border:0;min-height:44px;padding:11px 16px;border-radius:10px;font-weight:600;cursor:pointer;text-decoration:none;background:#e6edf6;color:#1b3d5c}
  .print-ui .print{background:#2673cc;color:#fff}
- @media screen{body{padding:12px 8px}.paper{max-width:277mm}.print-ui{position:sticky;top:0;background:#fff;padding:7px;z-index:5}}
- @media print{html,body{width:277mm!important;margin:0!important;padding:0!important} .print-ui{display:none!important}.paper{width:277mm!important;max-width:277mm!important;break-inside:avoid;page-break-inside:avoid} table,tr,td,th{break-inside:avoid;page-break-inside:avoid} thead .major th,thead .minor th{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important} .footer{break-inside:avoid}}
- </style></head><body class="${density}"><div class="print-ui"><button class="print" type="button" onclick="window.print()">Печать / Сохранить PDF</button><button id="returnButton" type="button">Закрыть и вернуться</button><a id="fallbackReturn" href="${htmlEsc(returnUrl)}" style="display:none">Вернуться в программу</a></div>
+ @media screen{body{padding:12px 8px}.paper{max-width:267mm}.print-ui{position:sticky;top:0;background:#fff;padding:7px;z-index:5}}
+ @media print{html,body{width:267mm!important;margin:0!important;padding:0!important} .print-ui{display:none!important}.paper{width:267mm!important;max-width:267mm!important;break-inside:avoid;page-break-inside:avoid} table,tr,td,th{break-inside:avoid;page-break-inside:avoid} thead .major th,thead .minor th{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important} .footer{break-inside:avoid}}
+ </style></head><body class="${density}"><div class="print-ui"><button class="print" id="printButton" type="button">Печать / Сохранить PDF</button><button id="returnButton" type="button">Закрыть и вернуться</button><a id="fallbackReturn" href="${htmlEsc(returnUrl)}" style="display:none">Вернуться в программу</a></div>
  <div class="paper"><div class="heading"><div>Группы уборки и</div><div class="second">проповеднического служения</div></div>
  <table><thead><tr class="major"><th colspan="2">Группа уборки: <b>А</b></th><th class="split" colspan="2">Группа уборки: <b>Б</b></th></tr><tr class="minor">${groups.map((g,i)=>`<th class="${i===2?'split':''}">ГПС - ${g}</th>`).join('')}</tr></thead><tbody><tr>${cells}</tr></tbody></table>
  <div class="footer"><span>Versammlung «<strong>Norderstedt russisch</strong>» (33779)</span><span class="footer-date">${dateStr}</span></div></div>
- <script>document.getElementById('returnButton').addEventListener('click',function(){window.close();setTimeout(function(){window.location.href=document.getElementById('fallbackReturn').href},200)});<\/script>
+ <script>
+ function fitRoster(){
+   var paper=document.querySelector('.paper');
+   // A4 landscape: 210 mm height minus 15 mm on each side.
+   // Leave a 2 mm safety reserve for iPad Safari print pagination.
+   var maxHeight=178*96/25.4;
+   var size=19;
+   paper.style.setProperty('--roster-font',size+'pt');
+   while(paper.getBoundingClientRect().height>maxHeight && size>9){
+     size=Math.round((size-.25)*100)/100;
+     paper.style.setProperty('--roster-font',size+'pt');
+   }
+ }
+ document.getElementById('returnButton').addEventListener('click',function(){window.close();setTimeout(function(){window.location.href=document.getElementById('fallbackReturn').href},200)});
+ document.getElementById('printButton').addEventListener('click',function(){fitRoster();window.print()});
+ if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitRoster);else window.addEventListener('load',fitRoster);
+ window.addEventListener('beforeprint',fitRoster);
+ <\/script>
  </body></html>`;
  w.document.open();w.document.write(doc);w.document.close();w.focus();return true;
 }
