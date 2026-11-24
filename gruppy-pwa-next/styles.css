@@ -523,3 +523,11 @@
 .url-eye{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:transparent;width:40px;height:40px;display:grid;place-items:center;color:#516579;border-radius:8px}
 .url-eye svg{width:24px;height:24px}
 .url-eye:focus-visible{outline:2px solid #347ad2}
+
+/* v55: reserve a dedicated hit area for the URL visibility control.
+   The opaque/fading overlay prevents long masked URLs from drawing over the icon. */
+.script-url-wrap{position:relative;isolation:isolate}
+.field .script-url-wrap input{box-sizing:border-box;padding-right:88px!important;overflow:hidden;text-overflow:clip}
+.script-url-wrap::after{content:"";position:absolute;right:44px;top:2px;bottom:2px;width:52px;pointer-events:none;z-index:2;background:linear-gradient(to right,rgba(247,246,241,0),#f7f6f1 82%)}
+.script-url-wrap .url-eye{position:absolute;z-index:3;right:7px;top:50%;width:42px;height:42px;transform:translateY(-50%);background:#f7f6f1;color:#455b76;opacity:1;cursor:pointer;touch-action:manipulation}
+.script-url-wrap .url-eye svg{width:25px;height:25px;display:block;flex:none}

@@ -87,10 +87,10 @@ function allGroupsPdf(columns){
  @page{size:A4 landscape;margin:15mm}
  *{box-sizing:border-box}
  html,body{margin:0;padding:0;color:#111;background:#fff;font-family:"Times New Roman",Georgia,serif}
- .paper{width:267mm;margin:0 auto}
+ .paper{width:267mm;margin:0 auto;--pdf-table-width:100%}
  .heading{height:19mm;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;font-weight:700;font-size:18pt;line-height:1.12}
  .heading .second{text-decoration:none}
- table{width:100%;margin-left:auto;margin-right:auto;border-collapse:collapse;table-layout:fixed;border:0.45pt solid #969696}
+ table{width:var(--pdf-table-width);max-width:100%;box-sizing:border-box;margin:0 auto;border-collapse:collapse;table-layout:fixed;border:0.45pt solid #969696}
  th{padding:1.2mm 1mm;text-align:center;font-weight:700;border:0.45pt solid #999}
  thead .major th{background:#e6eafa;font-weight:normal;font-size:15pt;padding:1.1mm 0}
  thead .major b{color:#a21820}
@@ -102,7 +102,7 @@ function allGroupsPdf(columns){
  .person.assistant{font-style:normal;font-weight:400}
  /* Divider lines only after the leader and the assistant, across the whole group column. */
  .person.leader,.person.assistant{border-bottom:.65pt solid #555;padding-bottom:.5mm;margin-bottom:.6mm}
- .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;width:100%;margin:2mm auto 0;min-height:5.2mm;padding:0 .5mm;font:11.8pt Arial,sans-serif}
+ .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;box-sizing:border-box;width:var(--pdf-table-width);max-width:100%;margin:2mm auto 0;min-height:5.2mm;padding:0 .5mm;font:11.8pt Arial,sans-serif}
  .footer strong{font-weight:700}
  .footer-date{font-style:italic}
  .print-ui{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;font:14px -apple-system,BlinkMacSystemFont,Arial,sans-serif}
@@ -117,6 +117,9 @@ function allGroupsPdf(columns){
  <script>
  function fitRoster(){
    var paper=document.querySelector('.paper');
+   var table=paper.querySelector('table');
+   var footer=paper.querySelector('.footer');
+   if(table&&footer){footer.style.width=table.getBoundingClientRect().width+'px';}
    // A4 landscape: 210 mm height minus 15 mm on each side.
    // Leave a 2 mm safety reserve for iPad Safari print pagination.
    var maxHeight=178*96/25.4;
