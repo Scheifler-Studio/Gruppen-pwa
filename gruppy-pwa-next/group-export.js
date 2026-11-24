@@ -69,74 +69,112 @@ function pdf(group,rows){
  w.document.open();w.document.write(doc);w.document.close();w.focus();return true;
 }
 
-function allGroupsPdf(columns){
- const w=window.open('','_blank');if(!w)return false;
- // Preserve popup return behavior and avoid touching the user's stored app state.
- const returnUrl=window.location.href;
+// Export an actual one-page PDF. No browser print dialog, header/footer, or page orientation defaults.
+// The whole document is painted to a landscape A4 canvas and embedded as a JPEG
+// inside a minimal PDF file. Only the local roster data is used.
+async function allGroupsPdf(columns){
+ const mm=6, pageW=297, pageH=210, margin=15;
+ const canvas=document.createElement('canvas');
+ canvas.width=Math.round(pageW*mm);canvas.height=Math.round(pageH*mm);
+ const ctx=canvas.getContext('2d',{alpha:false});
+ if(!ctx)throw new Error('Не удалось создать PDF на устройстве');
+ ctx.scale(mm,mm);
+ ctx.fillStyle='#ffffff';ctx.fillRect(0,0,pageW,pageH);
+ const serif='Georgia,"Times New Roman",serif';
+ const sans='Arial,-apple-system,sans-serif';
+ const setFont=(pt,bold=false,family=serif)=>{ctx.font=(bold?'bold ':'')+(pt*25.4/72).toFixed(3)+'px '+family};
+ const line=(x1,y1,x2,y2,color='#969696',width=.18)=>{ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=width;ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
+ const text=(v,x,y,align='left',color='#151515')=>{ctx.fillStyle=color;ctx.textBaseline='alphabetic';ctx.textAlign=align;ctx.fillText(String(v??''),x,y)};
+ const x0=margin, x1=pageW-margin, totalW=x1-x0, colW=totalW/4;
  const groups=['А1','А2','Б1','Б2'];
- const maxCount=Math.max(0,...columns.map(group=>group.length));
- // The longest column determines one shared font size across all four columns.
- const density='normal';
- const cells=columns.map((people,i)=>`<td class="people-col ${i===2?'split':''}">${people.map(person=>{
-  const role=person.role==='leader'?'leader':person.role==='assistant'?'assistant':'';
-  return `<div class="person ${role}">${htmlEsc(person.name)}</div>`;
- }).join('')}</td>`).join('');
- const dateStr=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Berlin'});
- const doc=`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Группы уборки и проповеднического служения</title>
- <style>
- @page{size:A4 landscape;margin:15mm}
- *{box-sizing:border-box}
- html,body{margin:0;padding:0;color:#111;background:#fff;font-family:"Times New Roman",Georgia,serif}
- .paper{width:267mm;margin:0 auto;--pdf-table-width:100%}
- .heading{height:19mm;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;font-weight:700;font-size:18pt;line-height:1.12}
- .heading .second{text-decoration:none}
- table{width:var(--pdf-table-width);max-width:100%;box-sizing:border-box;margin:0 auto;border-collapse:collapse;table-layout:fixed;border:0.45pt solid #969696}
- th{padding:1.2mm 1mm;text-align:center;font-weight:700;border:0.45pt solid #999}
- thead .major th{background:#e6eafa;font-weight:normal;font-size:15pt;padding:1.1mm 0}
- thead .major b{color:#a21820}
- thead .minor th{background:#e5e5e5;font-size:15pt;padding:2mm .5mm}
- th.split,td.split{border-left:2.3pt double #252525!important}
- td.people-col{padding:1.1mm 1mm .8mm;vertical-align:top;border-left:.45pt solid #a3a3a3;border-right:.45pt solid #a3a3a3;border-top:0;border-bottom:0}
- .person{font-size:var(--roster-font,16pt);line-height:1.09;margin:0 0 .3mm;overflow-wrap:break-word;word-break:normal}
- .person.leader{font-weight:700}
- .person.assistant{font-style:normal;font-weight:400}
- /* Divider lines only after the leader and the assistant, across the whole group column. */
- .person.leader,.person.assistant{border-bottom:.65pt solid #555;padding-bottom:.5mm;margin-bottom:.6mm}
- .footer{display:flex;justify-content:space-between;align-items:center;border:.55pt solid #555;box-sizing:border-box;width:var(--pdf-table-width);max-width:100%;margin:2mm auto 0;min-height:5.2mm;padding:0 .5mm;font:11.8pt Arial,sans-serif}
- .footer strong{font-weight:700}
- .footer-date{font-style:italic}
- .print-ui{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;font:14px -apple-system,BlinkMacSystemFont,Arial,sans-serif}
- .print-ui button,.print-ui a{border:0;min-height:44px;padding:11px 16px;border-radius:10px;font-weight:600;cursor:pointer;text-decoration:none;background:#e6edf6;color:#1b3d5c}
- .print-ui .print{background:#2673cc;color:#fff}
- @media screen{body{padding:12px 8px}.paper{max-width:267mm}.print-ui{position:sticky;top:0;background:#fff;padding:7px;z-index:5}}
- @media print{html,body{width:267mm!important;margin:0!important;padding:0!important} .print-ui{display:none!important}.paper{width:267mm!important;max-width:267mm!important;break-inside:avoid;page-break-inside:avoid} table,tr,td,th{break-inside:avoid;page-break-inside:avoid} thead .major th,thead .minor th{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important} .footer{break-inside:avoid}}
- </style></head><body class="${density}"><div class="print-ui"><button class="print" id="printButton" type="button">Печать / Сохранить PDF</button><button id="returnButton" type="button">Закрыть и вернуться</button><a id="fallbackReturn" href="${htmlEsc(returnUrl)}" style="display:none">Вернуться в программу</a></div>
- <div class="paper"><div class="heading"><div>Группы уборки и</div><div class="second">проповеднического служения</div></div>
- <table><thead><tr class="major"><th colspan="2">Группа уборки: <b>А</b></th><th class="split" colspan="2">Группа уборки: <b>Б</b></th></tr><tr class="minor">${groups.map((g,i)=>`<th class="${i===2?'split':''}">ГПС - ${g}</th>`).join('')}</tr></thead><tbody><tr>${cells}</tr></tbody></table>
- <div class="footer"><span>Versammlung «<strong>Norderstedt russisch</strong>» (33779)</span><span class="footer-date">${dateStr}</span></div></div>
- <script>
- function fitRoster(){
-   var paper=document.querySelector('.paper');
-   var table=paper.querySelector('table');
-   var footer=paper.querySelector('.footer');
-   if(table&&footer){footer.style.width=table.getBoundingClientRect().width+'px';}
-   // A4 landscape: 210 mm height minus 15 mm on each side.
-   // Leave a 2 mm safety reserve for iPad Safari print pagination.
-   var maxHeight=178*96/25.4;
-   var size=19;
-   paper.style.setProperty('--roster-font',size+'pt');
-   while(paper.getBoundingClientRect().height>maxHeight && size>9){
-     size=Math.round((size-.25)*100)/100;
-     paper.style.setProperty('--roster-font',size+'pt');
+ // Decide a single size for all four columns by measuring the longest column.
+ const maxNameWidth=colW-3;
+ const splitName=(name)=>{
+   const parts=String(name||'').trim().split(/\s+/);const out=[];let current='';
+   for(const part of parts){let candidate=current?current+' '+part:part;
+     if(ctx.measureText(candidate).width<=maxNameWidth){current=candidate;continue}
+     if(current)out.push(current);
+     current=part;
+     // Keep unbreakable names inside the column by an explicit character wrap.
+     while(ctx.measureText(current).width>maxNameWidth && current.length>1){
+       let k=current.length-1;while(k>1&&ctx.measureText(current.slice(0,k)).width>maxNameWidth)k--;
+       out.push(current.slice(0,k));current=current.slice(k);
+     }
+   }
+   if(current)out.push(current);return out.length?out:[''];
+ };
+ const maxBottom=pageH-margin-9; // Reserve the footer and a small gap.
+ let chosenSize=12, chosenLines=[];
+ for(let fontSize=18;fontSize>=9;fontSize-=.25){
+   setFont(fontSize);
+   const lines=columns.map(people=>people.map(p=>splitName(p.name)));
+   const step=fontSize*25.4/72*1.18;
+   const contentMax=Math.max(0,...lines.map(group=>group.reduce((n,nameParts)=>n+nameParts.length*step+.24,0)));
+   // heading 18 mm, two colored heading bands 12 mm, content starts at y=50.
+   if(50+contentMax+1<=maxBottom){chosenSize=fontSize;chosenLines=lines;break}
+ }
+ if(!chosenLines.length){setFont(chosenSize);chosenLines=columns.map(group=>group.map(p=>splitName(p.name)))}
+ const step=chosenSize*25.4/72*1.18;
+ const tall=Math.max(0,...chosenLines.map(group=>group.reduce((n,lines)=>n+lines.length*step+.24,0)));
+ const headerY=32, majorH=6, minorH=7, peopleTop=headerY+majorH+minorH;
+ const tableBottom=Math.min(pageH-margin-8,Math.max(peopleTop+2,peopleTop+tall+1.5));
+ // Heading without underlines.
+ setFont(18,true);text('Группы уборки и',pageW/2,20,'center');
+ text('проповеднического служения',pageW/2,27,'center');
+ // Table header: soft periwinkle for A/B and light grey for A1 etc.
+ ctx.fillStyle='#e6eafa';ctx.fillRect(x0,headerY,totalW,majorH);
+ ctx.fillStyle='#e5e5e5';ctx.fillRect(x0,headerY+majorH,totalW,minorH);
+ line(x0,headerY,x1,headerY);line(x0,headerY+majorH,x1,headerY+majorH);
+ line(x0,peopleTop,x1,peopleTop);
+ setFont(14);text('Группа уборки: А',x0+colW,headerY+4.4,'center');text('Группа уборки: Б',x0+3*colW,headerY+4.4,'center');
+ setFont(14,true);for(let i=0;i<4;i++)text('ГПС - '+groups[i],x0+(i+.5)*colW,headerY+majorH+5,'center');
+ // Individual columns; strong double vertical division between A and B.
+ for(let i=0;i<=4;i++){
+   const x=x0+i*colW;
+   if(i===2){line(x-.35,headerY,x-.35,tableBottom,'#333',.33);line(x+.35,headerY,x+.35,tableBottom,'#333',.33)}
+   else line(x,headerY,x,tableBottom,'#888',.18);
+ }
+ line(x0,tableBottom,x1,tableBottom,'#888',.18);
+ for(let g=0;g<4;g++){
+   let y=peopleTop+.9;
+   const people=columns[g]||[];
+   for(let i=0;i<people.length;i++){
+     const person=people[i], role=person.role;
+     const rows=chosenLines[g][i];
+     setFont(chosenSize,role==='leader');
+     for(const part of rows){y+=step;text(part,x0+g*colW+1,y-.3)}
+     y+=.24;
+     if(role==='leader'||role==='assistant')line(x0+g*colW+.5,y,x0+(g+1)*colW-.5,y,'#777',.2);
    }
  }
- document.getElementById('returnButton').addEventListener('click',function(){window.close();setTimeout(function(){window.location.href=document.getElementById('fallbackReturn').href},200)});
- document.getElementById('printButton').addEventListener('click',function(){fitRoster();window.print()});
- if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitRoster);else window.addEventListener('load',fitRoster);
- window.addEventListener('beforeprint',fitRoster);
- <\/script>
- </body></html>`;
- w.document.open();w.document.write(doc);w.document.close();w.focus();return true;
+ // Footer shares exactly the outer table edges and stays in the one-page canvas.
+ const fy=tableBottom+2;
+ line(x0,fy,x1,fy,'#666',.22);line(x0,fy+5.8,x1,fy+5.8,'#666',.22);
+ line(x0,fy,x0,fy+5.8,'#666',.22);line(x1,fy,x1,fy+5.8,'#666',.22);
+ setFont(10,false,sans);text('Versammlung «Norderstedt russisch» (33779)',x0+.7,fy+4);
+ const date=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Berlin'});
+ text(date,x1-.7,fy+4,'right');
+ const jpg=await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Не удалось создать PDF')),'image/jpeg',.94));
+ const jpeg=new Uint8Array(await jpg.arrayBuffer());
+ const encoder=new TextEncoder(),parts=[],offsets=[0],length={value:0};
+ const append=chunk=>{const arr=typeof chunk==='string'?encoder.encode(chunk):chunk;parts.push(arr);length.value+=arr.length};
+ const obj=(n,content)=>{offsets[n]=length.value;append(n+' 0 obj\n');append(content);append('\nendobj\n')};
+ append('%PDF-1.4\n');
+ obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+ obj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+ obj(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>');
+ offsets[4]=length.value;append('4 0 obj\n<< /Type /XObject /Subtype /Image /Width '+canvas.width+' /Height '+canvas.height+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpeg.length+' >>\nstream\n');append(jpeg);append('\nendstream\nendobj\n');
+ const stream='q\n841.89 0 0 595.28 0 0 cm\n/Im1 Do\nQ\n';
+ obj(5,'<< /Length '+encoder.encode(stream).length+' >>\nstream\n'+stream+'endstream');
+ const xref=length.value;append('xref\n0 6\n0000000000 65535 f \n');
+ for(let i=1;i<=5;i++)append(String(offsets[i]).padStart(10,'0')+' 00000 n \n');
+ append('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF');
+ const result=new Blob(parts,{type:'application/pdf'});
+ const url=URL.createObjectURL(result),a=document.createElement('a');
+ a.href=url;a.download='Группы уборки и проповеднического служения.pdf';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),120000);
+ return true;
 }
 
 window.GruppenGroupExport={excel,pdf,allGroupsPdf};

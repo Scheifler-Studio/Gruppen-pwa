@@ -463,11 +463,11 @@ function showAllGroupsExport(){
   });
   return rows.map(m=>({name:[m.lastName,m.firstName].filter(Boolean).join(' '),role:m.role||''}));
  });
- openModal('Экспорт — Все участники',`<div class="group-export-dialog"><p>«Группы для уборки и проповеднического служения» — четыре колонки: А1, А2, Б1, Б2. Ответственные и помощники идут первыми. PDF формируется по текущим данным приложения.</p><div class="export-options"><button id="exportPdfAll" type="button" class="export-option"><strong>PDF · A4 горизонтально</strong><small>Печать → Сохранить как PDF</small></button></div><div class="actions"><button id="exportClose" type="button" class="secondary">Закрыть</button></div></div>`);
+ openModal('Экспорт — Все участники',`<div class="group-export-dialog"><p>«Группы для уборки и проповеднического служения» — четыре колонки: А1, А2, Б1, Б2. Ответственные и помощники идут первыми. PDF формируется по текущим данным приложения.</p><div class="export-options"><button id="exportPdfAll" type="button" class="export-option"><strong>PDF · A4 горизонтально</strong><small>Готовый PDF без печати, A4 горизонтально</small></button></div><div class="actions"><button id="exportClose" type="button" class="secondary">Закрыть</button></div></div>`);
  $('exportClose').onclick=closeModal;
- $('exportPdfAll').onclick=()=>{try{
-  const opened=GruppenGroupExport.allGroupsPdf(byGroup);
-  if(!opened){showToast('Разреши всплывающие окна Safari для PDF');return}
+ $('exportPdfAll').onclick=async()=>{try{
+  const opened=await GruppenGroupExport.allGroupsPdf(byGroup);
+  if(!opened){showToast('Не удалось подготовить PDF');return}
   closeModal();
  }catch(err){showToast('Ошибка экспорта PDF: '+err.message)}};
 }
@@ -476,7 +476,7 @@ function showGroupExport(){
  if(selected==='none')return;
  const groupId=selected;
  const name=groupName(groupId);
- openModal('Экспорт — Группа '+name,`<div class="group-export-dialog"><p>Список участников группы в текущем порядке сортировки. Ответственный за группу будет первым, помощник — вторым.</p><div class="export-options"><button id="exportExcel" type="button" class="export-option"><strong>Excel (.xlsx)</strong><small>Скачать таблицу</small></button><button id="exportPdf" type="button" class="export-option"><strong>PDF · A4</strong><small>Печать → Сохранить как PDF</small></button></div><div class="actions"><button id="exportClose" type="button" class="secondary">Закрыть</button></div></div>`);
+ openModal('Экспорт — Группа '+name,`<div class="group-export-dialog"><p>Список участников группы в текущем порядке сортировки. Ответственный за группу будет первым, помощник — вторым.</p><div class="export-options"><button id="exportExcel" type="button" class="export-option"><strong>Excel (.xlsx)</strong><small>Скачать таблицу</small></button><button id="exportPdf" type="button" class="export-option"><strong>PDF · A4</strong><small>Готовый PDF без печати, A4 горизонтально</small></button></div><div class="actions"><button id="exportClose" type="button" class="secondary">Закрыть</button></div></div>`);
  $('exportClose').onclick=closeModal;
  const items=members.filter(m=>!m.hidden&&m.groupId===groupId);
  const collator=new Intl.Collator(['ru','de','en'],{sensitivity:'base'});
@@ -563,7 +563,7 @@ async function retrySavedSession(){
 }
 setInterval(()=>{if(!document.hidden)retrySavedSession()},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)retrySavedSession()});
-const APP_VERSION=55;
+const APP_VERSION=57;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
