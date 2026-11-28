@@ -1,4 +1,4 @@
-/* Group roster export (local only): Excel XLSX and print-to-PDF A4. */
+/* Group roster export (local only): Excel XLSX and direct vector PDF A4. */
 (function(){
 'use strict';
 const headers=['№','Фамилия и имя','Вид служения','Назначение'];
@@ -44,31 +44,11 @@ function excel(group,rows){
  const blob=zipFiles(files),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Группа_'+String(group).replace(/[\\/:*?"<>|]/g,'_')+'.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 function pdf(group,rows){
- const w=window.open('','_blank');if(!w)return false;
- // Keep the original application URL in the return link; all user data stays in the app.
- const returnUrl=window.location.href;
- const cells=rows.map(r=>`<tr class="${r.role?'role':''}"><td>${r.number}</td><td>${htmlEsc(r.name)}</td><td>${htmlEsc(r.category)}</td><td>${htmlEsc(r.role)}</td></tr>`).join('');
- const doc=`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Группа ${htmlEsc(group)} — список участников</title><style>
- @page{size:A4 landscape;margin:10mm}
- *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Arial",sans-serif;color:#172b3f;margin:0;font-size:7pt}h1{font-size:14pt;text-align:center;margin:0 0 1.5mm}p{font-size:7pt;color:#637588;margin:0 0 3mm;text-align:center}
- table{border-collapse:collapse;width:100%;table-layout:fixed}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:1px solid #bdc8d5;padding:1mm .6mm;vertical-align:middle;line-height:1.13;overflow-wrap:break-word;word-break:normal}th{background:#ebf1f8;color:#223f61;font-weight:700;text-align:center}
- th:nth-child(1){width:7%}th:nth-child(2){width:46%}th:nth-child(3){width:19%}th:nth-child(4){width:28%}
- td{text-align:center}td:nth-child(2){text-align:left}td:nth-child(1){text-align:center}.telephone{white-space:nowrap;font-size:6.7pt;letter-spacing:-.2px;overflow-wrap:normal;word-break:keep-all}
- .role{background:#f4f8fc;font-weight:600}.role+tr:not(.role) td{border-top:2px solid #7b9abf}
- .print-ui{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:0 0 18px;font-size:14px}
- .print-ui button,.print-ui a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border:0;border-radius:10px;padding:12px 17px;font:600 15px -apple-system,BlinkMacSystemFont,"Arial",sans-serif;cursor:pointer;min-height:44px}
- .print-ui button.print{background:#2673cc;color:#fff}.print-ui button.exit{background:#e7edf5;color:#203d5d}.print-ui a{background:#e7edf5;color:#203d5d}
- @media screen{body{max-width:100%;margin:0 auto;padding:14px 8px}.paper{width:100%;max-width:297mm;margin:auto}.print-ui{position:sticky;top:0;z-index:5;background:#fff;padding:8px 2px;border-bottom:1px solid #ccd6e1}}
- @media print{.print-ui{display:none!important}body{padding:0!important}.paper{max-width:none!important}}
- </style></head><body><div class="print-ui"><button type="button" class="print" onclick="window.print()">Печать / Сохранить PDF</button><button type="button" class="exit" id="returnButton">Закрыть и вернуться</button><a id="fallbackReturn" href="${htmlEsc(returnUrl)}" target="_self" style="display:none">Вернуться в программу</a></div><div class="paper"><h1>Группа ${htmlEsc(group)}</h1><p>Список участников · ${rows.length} чел.</p><table><thead><tr>${headers.map(h=>`<th>${htmlEsc(h)}</th>`).join('')}</tr></thead><tbody>${cells}</tbody></table></div>
- <script>document.getElementById('returnButton').addEventListener('click',function(){
-   // Popups created by script close normally on iPad Safari; fallback always allows navigation.
-   window.close();
-   setTimeout(function(){window.location.href=document.getElementById('fallbackReturn').href;},180);
- });<\/script></body></html>`;
- w.document.open();w.document.write(doc);w.document.close();w.focus();return true;
+ const blob=buildGroupPdfBlob(group,rows);
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='Группа_'+String(group).replace(/[\\/:*?"<>|]/g,'_')+'.pdf';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),120000);return true;
 }
-
 // Export an actual one-page PDF. No browser print dialog, header/footer, or page orientation defaults.
 // Create a true vector PDF: text is encoded as a searchable/selectable Type3 PDF
 // font with ToUnicode maps. No canvas, JPEG, PNG or printed web page is used.
@@ -131,14 +111,17 @@ function buildAllGroupsPdfBlob(columns){
  const fy=tableBottom+2;line(x0,fy,x1,fy,'#666',.22);line(x0,fy+5.8,x1,fy+5.8,'#666',.22);line(x0,fy,x0,fy+5.8,'#666',.22);line(x1,fy,x1,fy+5.8,'#666',.22);
  setFont(10);text('Versammlung «Norderstedt russisch» (33779)',x0+.7,fy+4);
  const date=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Berlin'});text(date,x1-.7,fy+4,'right');
- const stream=chunks.join('');
+ return writeVectorPdf([chunks.join('')],data,chars,PW,PH,fmt);
+}
+function writeVectorPdf(streams,data,chars,PW,PH,fmt){
  const objects=[];const put=(s)=>{objects.push(s);return objects.length};
  const pdfEsc=s=>String(s).replace(/[\\()]/g,'\\$&');
  const unicodeHex=c=>{const arr=[];for(let i=0;i<c.length;i++)arr.push(c.charCodeAt(i).toString(16).padStart(4,'0'));return arr.join('')};
  const cmapBody=[];for(let i=0;i<chars.length;i+=90){const part=chars.slice(i,i+90);cmapBody.push(`${part.length} beginbfchar\n${part.map((c,j)=>`<${(i+j+1).toString(16).padStart(2,'0')}> <${unicodeHex(c)}> `).join('\n')}\nendbfchar`)}
  const cmap=`/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /GruppenUnicode def\n/CMapType 2 def\n1 begincodespacerange\n<01> <FF>\nendcodespacerange\n${cmapBody.join('\n')}\nendcmap\nCMapName currentdict /CMap defineresource pop\nend end`;
  const objStream=s=>`<< /Length ${new TextEncoder().encode(s).length} >>\nstream\n${s}\nendstream`;
- const catalog=put(''),pages=put(''),page=put(''),content=put(objStream(stream));
+ const catalog=put(''),pages=put('');
+ const pageRefs=streams.map(stream=>({page:put(''),content:put(objStream(stream))}));
  const fontObjs={};
  for(const [tag,key] of [['FR','r'],['FB','b']]){
   const charproc=[];
@@ -151,8 +134,8 @@ function buildAllGroupsPdfBlob(columns){
   fontObjs[tag]=put(`<< /Type /Font /Subtype /Type3 /Name /${tag} /FontBBox [-1000 -700 3000 2300] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << ${proc} >> /Encoding << /Type /Encoding /Differences [1 ${names}] >> /FirstChar 1 /LastChar ${chars.length} /Widths [${widths}] /Resources << >> /ToUnicode ${uni} 0 R >>`);
  }
  objects[catalog-1]=`<< /Type /Catalog /Pages ${pages} 0 R >>`;
- objects[pages-1]=`<< /Type /Pages /Kids [${page} 0 R] /Count 1 >>`;
- objects[page-1]=`<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${fmt(PW)} ${fmt(PH)}] /Resources << /Font << /FR ${fontObjs.FR} 0 R /FB ${fontObjs.FB} 0 R >> >> /Contents ${content} 0 R >>`;
+ objects[pages-1]=`<< /Type /Pages /Kids [${pageRefs.map(p=>p.page+" 0 R").join(" ")}] /Count ${pageRefs.length} >>`;
+ for(const {page,content} of pageRefs)objects[page-1]=`<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${fmt(PW)} ${fmt(PH)}] /Resources << /Font << /FR ${fontObjs.FR} 0 R /FB ${fontObjs.FB} 0 R >> >> /Contents ${content} 0 R >>`;
  const encoder=new TextEncoder(),dataChunks=[],offsets=[0];let byteCount=0;
  const push=s=>{const bytes=encoder.encode(s);dataChunks.push(bytes);byteCount+=bytes.length};
  push('%PDF-1.5\n');objects.forEach((s,i)=>{offsets[i+1]=byteCount;push(`${i+1} 0 obj\n${s}\nendobj\n`)});
@@ -161,11 +144,74 @@ function buildAllGroupsPdfBlob(columns){
  push(`trailer\n<< /Size ${objects.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`);
  return new Blob(dataChunks,{type:'application/pdf'});
 }
+function buildGroupPdfBlob(group,rows){
+ const data=window.GruppenPDFGlyphs;
+ if(!data||!data.r||!data.b)throw new Error('Не загрузились векторные символы PDF');
+ const chars=Object.keys(data.r).filter(c=>data.b[c]);
+ if(chars.length>254)throw new Error('Слишком много символов для PDF');
+ const encMap=new Map(chars.map((c,i)=>[c,i+1]));
+ const fallback=encMap.get('?')||1;
+ const ptPerMm=72/25.4, PW=297*ptPerMm,PH=210*ptPerMm;
+ const colorHex=h=>{let a=h.replace('#','');if(a.length===3)a=Array.from(a).map(c=>c+c).join('');return [0,2,4].map(i=>(parseInt(a.slice(i,i+2),16)/255).toFixed(4)).join(' ')};
+ const fmt=v=>(Math.round(v*1000)/1000).toString();
+ let currentSize=12,currentBold=false;
+ const setFont=(pt,bold=false)=>{currentSize=pt;currentBold=bold};
+ const glyph=c=>(data[currentBold?'b':'r'][c]||data[currentBold?'b':'r']['?']);
+ const measure=(v)=>Array.from(String(v??'')).reduce((n,c)=>n+(glyph(c)?.[0]||500)*currentSize/1000,0)/ptPerMm;
+ const chunks=[];
+ const add=s=>chunks.push(s);
+ const rect=(x,y,w,h,c)=>add(`${colorHex(c)} rg ${fmt(x*ptPerMm)} ${fmt((210-y-h)*ptPerMm)} ${fmt(w*ptPerMm)} ${fmt(h*ptPerMm)} re f\n`);
+ const line=(x,y,X,Y,c='#969696',thick=.18)=>add(`${colorHex(c)} RG ${fmt(thick*ptPerMm)} w ${fmt(x*ptPerMm)} ${fmt((210-y)*ptPerMm)} m ${fmt(X*ptPerMm)} ${fmt((210-Y)*ptPerMm)} l S\n`);
+ const text=(v,x,y,align='left',c='#151515',baseline='alphabetic')=>{
+  v=String(v??'');const w=measure(v);
+  const dx=align==='center'?w/2:align==='right'?w:0;
+  const yPt=(210-y)*ptPerMm-(baseline==='middle'?currentSize*.34:0);
+  const hex=Array.from(v).map(ch=>(encMap.get(ch)||fallback).toString(16).padStart(2,'0')).join('');
+  add(`${colorHex(c)} rg BT /${currentBold?'FB':'FR'} ${fmt(currentSize)} Tf ${fmt((x-dx)*ptPerMm)} ${fmt(yPt)} Td <${hex}> Tj ET\n`);
+ };
+ const streams=[],x0=10,x1=287,top=26,bottom=200;
+ const widths=[19.39,127.42,52.63,77.56], xs=[x0];
+ widths.forEach(w=>xs.push(xs[xs.length-1]+w));
+ const rowFont=7,step=3.5,pad=1.1;
+ function wrap(value,maxWidth){
+  const out=[];let line='';
+  for(const ch of Array.from(String(value??'').normalize('NFC'))){
+   if(ch==='\n'){out.push(line);line='';continue;}
+   if(line&&measure(line+ch)>maxWidth){out.push(line);line=ch;}else line+=ch;
+  }out.push(line);return out;
+ }
+ let y=top,previousRole=false;
+ function begin(){
+  chunks.length=0;setFont(14,true);text('Группа '+group,148.5,15,'center','#172b3f');
+  setFont(7);text('Список участников · '+rows.length+' чел.',148.5,20,'center','#637588');
+  y=top;rect(x0,y,x1-x0,6,'#ebf1f8');setFont(7,true);
+  headers.forEach((h,i)=>text(h,(xs[i]+xs[i+1])/2,y+3,'center','#223f61','middle'));
+  for(const x of xs)line(x,y,x,y+6,'#bdc8d5');line(x0,y,x1,y,'#bdc8d5');line(x0,y+6,x1,y+6,'#bdc8d5');y+=6;previousRole=false;
+ }
+ function finish(){streams.push(chunks.join(''));}
+ begin();
+ for(const r of rows){
+  const bold=!!r.role;setFont(rowFont,bold);
+  const cells=[r.number,r.name,r.category,r.role].map((v,i)=>wrap(v,widths[i]-2*pad));
+  const maxLines=Math.max(...cells.map(v=>v.length));let offset=0;
+  while(offset<maxLines){
+   if(y+step+2*pad>bottom){finish();begin();}
+   const count=Math.min(maxLines-offset,Math.floor((bottom-y-2*pad)/step));
+   const h=count*step+2*pad;setFont(rowFont,bold);
+   if(bold)rect(x0,y,x1-x0,h,'#f4f8fc');
+   if(previousRole&&!bold)line(x0,y,x1,y,'#7b9abf',.5);
+   cells.forEach((lines,i)=>lines.slice(offset,offset+count).forEach((v,j)=>text(v,i===1?xs[i]+pad:(xs[i]+xs[i+1])/2,y+pad+(j+.5)*step,i===1?'left':'center','#172b3f','middle')));
+   for(const x of xs)line(x,y,x,y+h,'#bdc8d5');line(x0,y+h,x1,y+h,'#bdc8d5');
+   y+=h;offset+=count;previousRole=bold;
+  }
+ }
+ finish();return writeVectorPdf(streams,data,chars,PW,PH,fmt);
+}
 async function allGroupsPdf(columns){
  const blob=buildAllGroupsPdfBlob(columns);
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Группы уборки и проповеднического служения.pdf';
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),120000);return true;
 }
 
-window.GruppenGroupExport={excel,pdf,allGroupsPdf,buildAllGroupsPdfBlob};
+window.GruppenGroupExport={excel,pdf,allGroupsPdf,buildAllGroupsPdfBlob,buildGroupPdfBlob};
 })();

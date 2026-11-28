@@ -205,10 +205,10 @@ function statusText(t){
   if($('connectGoogle'))$('connectGoogle').disabled=disable;
  }
 }
-function checkConnection(){if(!isConnected()&&!groups.length){showToast('Для первой загрузки данных подключи Google Drive в настройках');showSettings();return false}return true}
+function checkConnection(){if(!isConnected()&&!groups.length){showToast('Для первой загрузки данных подключи сервер QNAP в настройках');showSettings();return false}return true}
 function callGoogle(action,payload){return GoogleBridge.call(action,payload,token)}
 async function post(path,obj){
- if(!isConnected())throw Error('Google Drive не подключён. Открой настройки.');
+ if(!isConnected())throw Error('Сервер QNAP не подключён. Открой настройки.');
  const map={'/api/admin/group/rename':'renameGroup','/api/admin/group/delete':'deleteGroup','/api/admin/group':'group','/api/admin/member':'member','/api/admin/import':'import','/api/admin/pending/decision':'decision','/api/admin/archive':'archiveMember','/api/admin/report':'adminReport'};
  const action=map[path];if(!action)throw Error('Неизвестная операция');
  const r=await callGoogle(action,obj);
@@ -233,7 +233,7 @@ async function loginAndTest(password){
  if(!password){if(!token)throw Error('Сохранённая авторизация отсутствует. Требуется однократное восстановление доступа.');}
  else {const r=await GoogleBridge.call('login',{password});token=r.token;localStorage.setItem(sessionKey,token);sessionStorage.setItem(sessionKey,token)}
  const test=await GoogleBridge.call('test',{},token);
- if(!test?.ok)throw Error('Не удалось подтвердить запись в Google Drive');
+ if(!test?.ok)throw Error('Не удалось подтвердить запись на QNAP');
  connected=true;await refresh();if(writeQueue.length)retryWritesSoon(250);return test;
 }
 function requestAccessRecovery(){
@@ -241,7 +241,7 @@ function requestAccessRecovery(){
  $('recoverCancel').onclick=closeModal;
  $('recoverAccessForm').onsubmit=async event=>{event.preventDefault();const password=event.currentTarget.elements.access.value;closeModal();showConnectionProgress();try{await loginAndTest(password);finishConnectionProgress(null)}catch(error){statusText('Нужен вход секретаря');finishConnectionProgress(error)}};
 }
-function initBridge(url){GoogleBridge.connect(url);connected=false;statusText('Подключение к Google…')}
+function initBridge(url){GoogleBridge.connect(url);connected=false;statusText('Подключение к серверу…')}
 const GROUP_COLORS=[
  {id:'blue',name:'Голубой',bg:'#e8f3ff'},
  {id:'green',name:'Зелёный',bg:'#e8f7eb'},
@@ -317,12 +317,12 @@ function openReminderReceipts(){
 }
 function showSettings(){
  openModal('Настройки',`<form id="settingsForm">
- <h3>Google Drive</h3>
- <p class="hint">Сначала подключи Google Drive. Без подтверждённой связи создание участников и групп заблокировано. Ссылка — опубликованный адрес Google Apps Script, оканчивающийся на /exec.</p>
+ <h3>Сервер QNAP</h3>
+ <p class="hint">Сначала подключи сервер QNAP. Без подтверждённой связи создание участников и групп заблокировано. Ссылка — опубликованный адрес Google Apps Script, оканчивающийся на /exec.</p>
  <label class="field">Адрес Google Apps Script<div class="script-url-wrap"><input name="scriptUrl" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(settings.scriptUrl||'')}" placeholder="Адрес подключения" required><button id="revealScriptUrl" class="url-eye" type="button" aria-label="Показать адрес на три секунды" title="Показать на три секунды"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
  <div id="googleStatus" class="connection-status" role="status"></div>
  <button id="recoverAccess" class="secondary" type="button" ${token?'hidden':''}>Восстановить доступ</button>
- <div class="actions"><button class="secondary" type="button" id="testGoogle">Проверить подключение</button><button class="primary" type="submit" id="connectGoogle">Подключить Google Drive</button></div></form>
+ <div class="actions"><button class="secondary" type="button" id="testGoogle">Проверить подключение</button><button class="primary" type="submit" id="connectGoogle">Подключить сервер</button></div></form>
  <hr><section class="app-update-section" aria-label="Обновление программы"><h3>Обновление программы</h3>
  <p class="hint app-version-state" id="appUpdateStatus" role="status" aria-live="polite">Проверяем наличие обновления…</p>
  <div class="actions app-update-actions"><button class="secondary" type="button" id="checkAppUpdate">Проверить обновление</button><button class="primary" type="button" id="installAppUpdate" hidden>Обновить программу</button></div>
@@ -331,7 +331,7 @@ function showSettings(){
  <p class="hint">Выбери фоновый цвет для каждой группы. Он будет одинаковым в общем списке и при просмотре группы отдельно. Выбор сохраняется на этом iPad.</p>
  <div class="group-color-settings">${groups.length?groups.map(g=>`<div class="group-color-row"><span>Группа <strong>${esc(g.name)}</strong></span><select class="group-color-select" data-color-group="${esc(g.id)}" aria-label="Цвет группы ${esc(g.name)}">${GROUP_COLORS.map(c=>`<option value="${c.id}" ${((settings.groupColors?.[String(g.id)]||DEFAULT_COLORS[Math.max(0,groups.findIndex(x=>x.id===g.id))%DEFAULT_COLORS.length])===c.id)?'selected':''}>${c.name}</option>`).join('')}</select><span class="group-color-preview" data-color-preview="${esc(g.id)}" style="background:${groupColor(g.id)}"></span></div>`).join(''):'<p class="hint">Сначала создай группу, чтобы выбрать её цвет.</p>'}</div>
  <hr><h3>Перенос существующих участников</h3>
- <p class="hint">Импорт доступен только после подключения. Перенос выполняется в пустую папку Google Drive, чтобы избежать дубликатов. Локальные данные не удаляются.</p>
+ <p class="hint">Импорт доступен только после подключения. Перенос выполняется в пустую базу QNAP, чтобы избежать дубликатов. Локальные данные не удаляются.</p>
  <button class="secondary" type="button" id="importLocal" ${!isConnected()?'disabled':''}>Импортировать прежние данные</button>`);
  document.querySelectorAll('[data-color-group]').forEach(select=>{select.onchange=()=>{
   settings.groupColors={...(settings.groupColors||{}),[select.dataset.colorGroup]:select.value};saveSettings();
@@ -419,14 +419,14 @@ function showSettings(){
   try{
    const data=JSON.parse(localStorage.getItem(older)||'{}');
    if(!Array.isArray(data.groups)||!Array.isArray(data.members)||!data.groups.length){showToast('Локальные данные прежней версии не найдены');return}
-   if(!confirm(`Перенести ${data.groups.length} групп и ${data.members.length} участников? Только если папка Google Drive пустая. Локальные данные останутся.`))return;
+   if(!confirm(`Перенести ${data.groups.length} групп и ${data.members.length} участников? Только если база QNAP пустая. Локальные данные останутся.`))return;
    const r=await post('/api/admin/import',{groups:data.groups,members:data.members});
    showToast(`Перенесено: ${r.groups} групп и ${r.members} участников`);await refresh();closeModal();
   }catch(e){showToast(e.message)}
  };
 }
 function showGroup(){if(!checkConnection())return;openModal('Новая группа','<form id="groupForm"><label class="field">Название группы<input name="name" required maxlength="100" placeholder="Например, A1"></label><div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Создать</button></div></form>');$('cancel').onclick=closeModal;$('groupForm').onsubmit=e=>{e.preventDefault();const name=e.currentTarget.elements.name.value.trim();if(!name)return;closeModal();queueWrite('group',{name},null,{groupId:localMemberId()})}}
-function showMember(m=null){if(!checkConnection())return;if(!groups.length){showToast('Сначала создай группу');return}const grp=m?.groupId||(['all','none'].includes(selected)?groups[0].id:selected),role=m?.role||'';openModal(m?'Карточка участника':'Новый участник',`<form id="memberForm" class="compact-member-form"><div class="member-name-row"><label class="field">Имя<input required name="firstName" value="${esc(m?.firstName||'')}"></label><label class="field">Фамилия<input required name="lastName" value="${esc(m?.lastName||'')}"></label></div><div class="member-role-row"><label class="field group-small">Группа<select name="groupId">${groups.map(g=>`<option value="${esc(g.id)}" ${g.id===grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><label class="field">Назначить<select name="role"><option value="">Выбрать</option><option value="leader" ${role==='leader'?'selected':''}>Ответственный за группу</option><option value="assistant" ${role==='assistant'?'selected':''}>Помощник</option></select></label><label id="codeField" class="field code-small" ${role?'':'hidden'}>Код<input name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="••••" value="${esc(m?pendingCodes[String(m.id)]||'':'')}"></label></div><label class="field">Вид служения<select name="category"><option value="">Не указана</option>${serviceTypes.map(x=>`<option ${m?.category===x?'selected':''}>${x}</option>`).join('')}</select></label>${m?`<p class="hint">Дата создания: ${esc(date(m.addedAt))}<br>Файл: ${esc(m.fileName||'')}</p>`:''}${m?`<div class="archive-area"><button type="button" class="archive-action" id="archiveMember">Удалить участника</button></div>`:''}<div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Сохранить</button></div></form>`);const form=$('memberForm');form.elements.role.onchange=()=>{const has=!!form.elements.role.value;$('codeField').hidden=!has;form.elements.code.required=false};form.elements.groupId.onchange=()=>form.elements.role.onchange();form.elements.role.onchange();$('cancel').onclick=closeModal;if(m){$('archiveMember').onclick=()=>{openModal('Удаление участника',`<p>Вы действительно хотите удалить из активного списка <strong>${esc(m.lastName)} ${esc(m.firstName)}</strong>?</p><p class="hint">JSON и прежние отчёты останутся на Google Drive. Если участник имеет назначение, доступ его телефона будет отозван.</p><div class="actions"><button class="secondary" id="archiveCancel" type="button">Отмена</button><button class="danger-button" id="archiveConfirm" type="button">Удалить</button></div>`);$('archiveCancel').onclick=()=>showMember(m);$('archiveConfirm').onclick=()=>{closeModal();if(!queueWrite('archive',{memberId:m.id},m.id)){showToast('Не удалось сохранить удаление на iPad. Попробуй снова.');return;}showToast('Участник скрыт. Архивирование отправляется на сервер…')}}};form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget.elements,obj={id:m?.id,firstName:f.firstName.value.trim(),lastName:f.lastName.value.trim(),groupId:f.groupId.value,role:f.role.value,code:(f.code.value.trim()===(m?pendingCodes[String(m.id)]||'':''))?'':f.code.value.trim(),address:m?.address||'',phone:m?.phone||'',phone2:m?.phone2||'',trustedFirstName:m?.trustedFirstName||'',trustedLastName:m?.trustedLastName||'',trustedPhone:m?.trustedPhone||'',category:f.category.value,categoryMonth:$('reportMonth').value,addedAt:m?.addedAt,fileName:m?.fileName};if(obj.code&&!/^\d{4}$/.test(obj.code))return showToast('Введите четырёхзначное число');closeModal();
+function showMember(m=null){if(!checkConnection())return;if(!groups.length){showToast('Сначала создай группу');return}const grp=m?.groupId||(['all','none'].includes(selected)?groups[0].id:selected),role=m?.role||'';openModal(m?'Карточка участника':'Новый участник',`<form id="memberForm" class="compact-member-form"><div class="member-name-row"><label class="field">Имя<input required name="firstName" value="${esc(m?.firstName||'')}"></label><label class="field">Фамилия<input required name="lastName" value="${esc(m?.lastName||'')}"></label></div><div class="member-role-row"><label class="field group-small">Группа<select name="groupId">${groups.map(g=>`<option value="${esc(g.id)}" ${g.id===grp?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label><label class="field">Назначить<select name="role"><option value="">Выбрать</option><option value="leader" ${role==='leader'?'selected':''}>Ответственный за группу</option><option value="assistant" ${role==='assistant'?'selected':''}>Помощник</option></select></label><label id="codeField" class="field code-small" ${role?'':'hidden'}>Код<input name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="••••" value="${esc(m?pendingCodes[String(m.id)]||'':'')}"></label></div><label class="field">Вид служения<select name="category"><option value="">Не указана</option>${serviceTypes.map(x=>`<option ${m?.category===x?'selected':''}>${x}</option>`).join('')}</select></label>${m?`<p class="hint">Дата создания: ${esc(date(m.addedAt))}<br>Файл: ${esc(m.fileName||'')}</p>`:''}${m?`<div class="archive-area"><button type="button" class="archive-action" id="archiveMember">Удалить участника</button></div>`:''}<div class="actions"><button type="button" class="secondary" id="cancel">Отмена</button><button class="primary">Сохранить</button></div></form>`);const form=$('memberForm');form.elements.role.onchange=()=>{const has=!!form.elements.role.value;$('codeField').hidden=!has;form.elements.code.required=false};form.elements.groupId.onchange=()=>form.elements.role.onchange();form.elements.role.onchange();$('cancel').onclick=closeModal;if(m){$('archiveMember').onclick=()=>{openModal('Удаление участника',`<p>Вы действительно хотите удалить из активного списка <strong>${esc(m.lastName)} ${esc(m.firstName)}</strong>?</p><p class="hint">JSON и прежние отчёты останутся на сервере QNAP. Если участник имеет назначение, доступ его телефона будет отозван.</p><div class="actions"><button class="secondary" id="archiveCancel" type="button">Отмена</button><button class="danger-button" id="archiveConfirm" type="button">Удалить</button></div>`);$('archiveCancel').onclick=()=>showMember(m);$('archiveConfirm').onclick=()=>{closeModal();if(!queueWrite('archive',{memberId:m.id},m.id)){showToast('Не удалось сохранить удаление на iPad. Попробуй снова.');return;}showToast('Участник скрыт. Архивирование отправляется на сервер…')}}};form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget.elements,obj={id:m?.id,firstName:f.firstName.value.trim(),lastName:f.lastName.value.trim(),groupId:f.groupId.value,role:f.role.value,code:(f.code.value.trim()===(m?pendingCodes[String(m.id)]||'':''))?'':f.code.value.trim(),address:m?.address||'',phone:m?.phone||'',phone2:m?.phone2||'',trustedFirstName:m?.trustedFirstName||'',trustedLastName:m?.trustedLastName||'',trustedPhone:m?.trustedPhone||'',category:f.category.value,categoryMonth:$('reportMonth').value,addedAt:m?.addedAt,fileName:m?.fileName};if(obj.code&&!/^\d{4}$/.test(obj.code))return showToast('Введите четырёхзначное число');closeModal();
  const localId=m?.id||localMemberId();obj.id=localId;
  queueWrite('member',{member:obj},localId);
 
@@ -507,7 +507,7 @@ function showGroupExport(){
  items.sort((a,b)=>{const ra=a.role==='leader'?0:a.role==='assistant'?1:2,rb=b.role==='leader'?0:b.role==='assistant'?1:2;if(ra!==rb)return ra-rb;if(order==='za')return -alpha(a,b);if(order==='added_desc')return String(b.addedAt||'').localeCompare(String(a.addedAt||''))||alpha(a,b);if(order==='added_asc')return String(a.addedAt||'').localeCompare(String(b.addedAt||''))||alpha(a,b);return alpha(a,b)});
  const rows=items.map((m,i)=>({number:i+1,name:[m.lastName,m.firstName].filter(Boolean).join(' '),role:m.role==='leader'?'Ответственный за группу':m.role==='assistant'?'Помощник':'',address:m.address||'',phone:m.phone||'',phone2:m.phone2||'',trustedName:[m.trustedLastName,m.trustedFirstName].filter(Boolean).join(' '),trustedPhone:m.trustedPhone||'',category:m.category||''}));
  $('exportExcel').onclick=()=>{try{GruppenGroupExport.excel(name,rows);closeModal();showToast('Excel подготовлен для сохранения')}catch(e){showToast('Ошибка экспорта Excel: '+e.message)}};
- $('exportPdf').onclick=()=>{try{const result=GruppenGroupExport.pdf(name,rows);if(!result){showToast('Разреши всплывающие окна Safari для создания PDF');return}closeModal()}catch(e){showToast('Ошибка подготовки PDF: '+e.message)}};
+ $('exportPdf').onclick=()=>{try{const result=GruppenGroupExport.pdf(name,rows);if(!result){showToast('Не удалось подготовить PDF');return}closeModal()}catch(e){showToast('Ошибка подготовки PDF: '+e.message)}};
 }
 $('groupExportButton').onclick=showGroupExport;
 $('foldGroups').onclick=()=>{groupOpen=!groupOpen;$('groupNav').hidden=!groupOpen;$('foldGroups').classList.toggle('open',groupOpen)};
@@ -586,7 +586,7 @@ async function retrySavedSession(){
 }
 setInterval(()=>{if(!document.hidden)retrySavedSession()},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)retrySavedSession()});
-const APP_VERSION=61;
+const APP_VERSION=63;
 let swRegistration=null, updateInProgress=false, updateReloadPending=false;
 function pageBusyForUpdate(){return !document.hidden && (!!document.querySelector('#backdrop:not([hidden])') || !!document.querySelector('#connectOverlay:not([hidden])'));}
 function applyPwaUpdate(){
@@ -619,7 +619,7 @@ if('serviceWorker'in navigator){
    // Only refresh after an upgrade, not on the very first installation.
    if(hadController)applyPwaUpdate();
  });
- navigator.serviceWorker.register('./sw.js?v=49',{updateViaCache:'none'}).then(async r=>{
+ navigator.serviceWorker.register('./sw.js?v=63',{updateViaCache:'none'}).then(async r=>{
   swRegistration=r;
   try{await r.update();}catch(e){}
   checkPwaUpdate();
